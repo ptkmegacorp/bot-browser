@@ -2,22 +2,23 @@
 
 One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend drives the tab via Playwright over loopback CDP and runs a Pi SDK agent with browser-only tools.
 
-See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria.
+See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria. See [VERIFICATION.md](./VERIFICATION.md) for how to run automated and manual checks.
 
 **Side panel UI:** dark chat/ledger layout with header model picker, **Agent on/off** switch, **follow active tab** (default) or pin-tab mode, bound-tab summary, in-chat working indicator, streamed messages, Stop while running, and a settings drawer. After backend changes: `npm run build` and **restart** `npm run start`; then reload the extension.
 
-**Icons / launcher:** `npm run icons` exports PNGs from `assets/icon.svg`; **`npm run install:desktop`** installs a user-local hicolor icon and GNOME launcher (required once per machine so **Ubuntu Shared Browser Agent** appears in Activities search). The repo path is baked in at install time via `scripts/launch-usba.sh`. Start the app from **Activities** or your own terminal (`bash scripts/launch-usba.sh`) so Chrome stays open—processes started from an IDE agent shell may be torn down when that shell ends.
+**Icons / launcher (optional, Linux):** `npm run icons` exports PNGs from `assets/icon.svg`; `npm run install:desktop` installs a user-local hicolor icon and GNOME launcher. The clone path is baked in at install time via `scripts/launch-usba.sh`. Start the app from your desktop environment or `bash scripts/launch-usba.sh` so Chrome is not tied to a short-lived IDE shell.
 
 ## Prerequisites
 
-- Ubuntu x86_64 with `/usr/bin/google-chrome`
-- Pi agent config at `~/.pi/agent/` (`models.json`, `auth.json`) — credentials stay out of this repo
+- Linux x86_64 with Google Chrome at `/usr/bin/google-chrome` (or set `USBA_CHROME_EXECUTABLE`)
+- [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) config at `~/.pi/agent/` (`models.json`, `auth.json`) — credentials stay out of this repo
 - Node.js 20+
 
 ## Install
 
 ```bash
-cd /home/tisthepassword/code/ubuntu-shared-browser-agent
+git clone https://github.com/ptkmegacorp/ubuntu-shared-browser-agent.git
+cd ubuntu-shared-browser-agent
 npm install
 npx playwright install chromium
 ```
@@ -50,7 +51,7 @@ npm run build
 npm run test:e2e-live        # optional: Pi model catalog (USBA_E2E_LIVE=1)
 npm run test:acceptance      # + real Pi/Qwen HTTP E2E (USBA_E2E_PI=1)
 npm run test:acceptance:codex  # Codex OAuth smoke (USBA_E2E_CODEX=1)
-npm run test:acceptance:panel  # actual open side panel + dedicated Chrome + real Qwen; synthetic data only
+npm run test:acceptance:panel  # open side panel + dedicated Chrome + real model; synthetic fixtures only
 ```
 
 ## Environment
@@ -61,3 +62,7 @@ npm run test:acceptance:panel  # actual open side panel + dedicated Chrome + rea
 | `USBA_HOST` | `127.0.0.1` |
 | `USBA_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
 | `USBA_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
+
+## License
+
+ISC — see [LICENSE](./LICENSE).

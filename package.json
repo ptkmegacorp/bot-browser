@@ -15,8 +15,15 @@
     "icons": "bash scripts/export-icons.sh",
     "install:desktop": "bash scripts/install-icons.sh"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": ["chrome", "browser-automation", "agent", "side-panel", "playwright"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ptkmegacorp/ubuntu-shared-browser-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ptkmegacorp/ubuntu-shared-browser-agent/issues"
+  },
+  "homepage": "https://github.com/ptkmegacorp/ubuntu-shared-browser-agent#readme",
   "license": "ISC",
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^1.0.0",

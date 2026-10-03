@@ -22,7 +22,7 @@ Use a friendly **🤖 robot-inspired icon** as the shared app identity: simple r
 - Keep one source SVG in `assets/`; export bundled PNGs at 16, 32, 48, 128, and 256px. No remote icon service, runtime font dependency, or unnecessary image library.
 - **GNOME:** install app icon under the user's hicolor icon theme and a `.desktop` launcher named **Ubuntu Shared Browser Agent**. Icon name `ubuntu-shared-browser-agent`; set appropriate launcher/window identity (`StartupWMClass=UbuntuSharedBrowserAgent` for X11). Verify actual GNOME dock/app-grid association on this device's Wayland session too; WM_CLASS alone may not establish Wayland identity. Launcher must start/reuse the backend and Agent Chrome, not spawn duplicate profiles.
 - **Chrome extension:** populate manifest `icons` and `action.default_icon` with matching PNGs; add local favicon links to side-panel HTML and other app-owned extension pages.
-- **App-owned tabs:** serve matching favicon assets for welcome/demo pages and any local app UI; include appropriate favicon links. Third-party website tabs keep their own site favicons—we do not override Indeed/other sites' identities.
+- **App-owned tabs:** serve matching favicon assets for welcome/demo pages and any local app UI; include appropriate favicon links. Third-party website tabs keep their own site favicons—we do not override external site branding.
 - Copy/installation is user-local, with no root requirement. Document icon/desktop installation and extension reload. Ship icons with the repo; check asset provenance/license if adapting external artwork.
 - Acceptance: app grid/dock, extension toolbar/management listing, side panel/app-owned tabs show matching crisp icons; no missing-asset requests. Check light/dark backgrounds and small sizes. Document any platform limitation rather than claiming all Chrome windows can be rebranded reliably.
 
@@ -164,9 +164,8 @@ Login/autofill handoff: pause ALL model page observations, snapshots, screenshot
 - Wrong origin/token and stale bindings fail closed. No keys/tokens in extension bundle or repository.
 
 ## References
-SAB reference checkout: `/tmp/sab-review/repo` (temporary), upstream https://github.com/ptkmegacorp/saturn-agent-browser. Borrow concepts, not Saturn's whole stack. Review license before copying source.
 
-Installed Pi docs: `/home/tisthepassword/.npm-global/lib/node_modules/@earendil-works/pi-coding-agent/docs/` — `sdk.md`, `providers.md`, `models.md`, `security.md`; SDK examples `09-api-keys-and-oauth.ts`, `12-full-control.ts`, `02-custom-model.ts`. Verify installed exported types before implementing.
+- Pi coding agent package docs (`sdk.md`, `providers.md`, `models.md`, `security.md`) and SDK examples under the installed `@earendil-works/pi-coding-agent` package — verify exported types against your installed version before implementing.
 
 ## Open decisions
 No blocking product questions. Defaults: Saturn Qwen during dev, Pi-authorized models selectable, one Agent profile/tab, human final clicks, native human autofill, non-secret agent handles optional. Prove endpoint tool calling, OAuth validity, side-panel lifecycle, and tab-to-CDP mapping during implementation rather than assuming them.
