@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent</title>
+    <link rel="icon" href="icons/icon-32.png" type="image/png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+      <header class="topbar">
+        <h1 class="title">Agent</h1>
+        <label class="model-wrap">
+          <span class="visually-hidden">Model</span>
+          <select id="model" class="model-select"></select>
+        </label>
+        <span id="connStatus" class="conn-status" role="status" aria-live="polite"></span>
+        <button type="button" id="agentEnabledSwitch" class="agent-switch" role="switch" aria-checked="true">
+          <span class="agent-switch-label">Agent on</span>
+        </button>
+        <button type="button" id="settingsBtn" class="icon-btn" aria-label="Settings" aria-expanded="false" aria-controls="settingsPanel">
+          <span aria-hidden="true">⚙</span>
+        </button>
+      </header>
+
+      <div id="tabSummary" class="tab-summary">
+        <span id="tabTitle" class="tab-title">No tab attached</span>
+        <span id="tabHost" class="tab-host"></span>
+        <span id="permCue" class="perm-cue" hidden>All sites</span>
+        <button type="button" id="attachTabQuick" class="link-btn" hidden>Attach a tab</button>
+      </div>
+
+      <div id="inlineBanner" class="inline-banner" role="status" hidden></div>
+
+      <main id="transcript" class="transcript" tabindex="0" aria-label="Conversation">
+        <button type="button" id="scrollToBottom" class="scroll-pill" hidden>New messages</button>
+      </main>
+
+      <div id="contextBar" class="context-bar" hidden>
+        <button type="button" id="resumeBtn" class="secondary-btn" hidden>Resume</button>
+        <button type="button" id="handoffBtn" class="secondary-btn" hidden>Human login</button>
+        <button type="button" id="handoffDoneBtn" class="primary-btn" hidden>Login done</button>
+      </div>
+
+      <form id="composer" class="composer">
+        <label class="visually-hidden" for="message">Message</label>
+        <textarea id="message" rows="2" placeholder="Ask the agent…" autocomplete="off"></textarea>
+        <div class="composer-actions">
+          <button type="submit" id="sendBtn" class="primary-btn">Send</button>
+          <button type="button" id="stopBtn" class="danger-btn" hidden>Stop</button>
+        </div>
+      </form>
+    </div>
+
+    <div id="settingsBackdrop" class="settings-backdrop" hidden></div>
+    <aside id="settingsPanel" class="settings-panel" role="dialog" aria-labelledby="settingsTitle" aria-modal="true" hidden>
+      <header class="settings-header">
+        <h2 id="settingsTitle">Settings</h2>
+        <button type="button" id="settingsClose" class="icon-btn" aria-label="Close settings">×</button>
+      </header>
+      <div class="settings-body">
+        <section class="settings-section" data-section="connection">
+          <h3>Connection</h3>
+          <p id="connDiag" class="diag"></p>
+          <label>Backend URL <input id="baseUrl" type="url" inputmode="url" autocomplete="off" /></label>
+          <label>Pairing token <input id="token" type="password" autocomplete="off" /></label>
+          <button type="button" id="saveConnect" class="primary-btn">Save &amp; connect</button>
+        </section>
+        <section class="settings-section" data-section="browser">
+          <h3>Browser</h3>
+          <label>Tab binding
+            <select id="bindingMode">
+              <option value="follow_active">Follow active tab</option>
+              <option value="pin_tab">Pin tab (manual attach)</option>
+            </select>
+          </label>
+          <button type="button" id="refreshTabs" class="secondary-btn">Refresh tabs</button>
+          <select id="tabList" size="4" aria-label="Chrome tabs"></select>
+          <div class="row-actions">
+            <button type="button" id="attachTab" class="primary-btn">Attach selected</button>
+            <button type="button" id="detachTab" class="secondary-btn">Detach agent</button>
+          </div>
+        </section>
+        <section class="settings-section" data-section="permissions">
+          <h3>Site permissions</h3>
+          <label class="allow-all-row">
+            <input type="checkbox" id="allowAllSites" />
+            Allow all sites
+          </label>
+          <p id="allowAllSitesStatus" class="help-text"></p>
+          <ul id="originList" class="origin-list"></ul>
+          <label>Approve origin
+            <input id="approveOrigin" type="text" placeholder="https://example.com" autocomplete="off" />
+          </label>
+          <button type="button" id="approveOriginBtn" class="primary-btn">Approve</button>
+        </section>
+        <section class="settings-section" data-section="help">
+          <h3>Help</h3>
+          <p class="help-text">
+            Use <strong>Human login</strong> before you enter passwords or MFA in the task tab. The agent pauses observations until you tap <strong>Login done</strong>.
+            Saturn requests go to your configured host; Codex goes to OpenAI. Only approve sites you trust.
+          </p>
+        </section>
+      </div>
+    </aside>
+
+    <script src="sidepanel.js"></script>
+  </body>
+</html>

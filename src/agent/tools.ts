@@ -1,0 +1,116 @@
+import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import type { BrowserController } from "../browser/controller.js";
+
+const Ref = Type.String({ description: "Element ref from page_snapshot (e.g. e3)" });
+const Generation = Type.Number({ description: "Snapshot generation from the page_snapshot that produced this ref" });
+
+export function createBrowserTools(controller: BrowserController): ToolDefinition[] {
+	const pageSnapshot = defineTool({
+		name: "page_snapshot",
+		label: "Page snapshot",
+		description:
+			"Return interactive elements on the bound task tab. Always call before click/fill/select and pass the returned generation with refs.",
+		parameters: Type.Object({}),
+		async execute() {
+			const snap = await controller.snapshot();
+			const lines = snap.nodes.map(
+				(n) => `${n.ref} ${n.role} "${n.name}"${n.value ? ` value=${n.value}` : ""}`,
+			);
+			return {
+				content: [
+					{
+						type: "text",
+						text: `url: ${snap.url}\ntitle: ${snap.title}\ngeneration: ${snap.generation}\n${lines.join("\n")}`,
+					},
+				],
+				details: { generation: snap.generation },
+			};
+		},
+	});
+
+	const browserNavigate = defineTool({
+		name: "browser_navigate",
+		label: "Navigate",
+		description: "Navigate the bound task tab to an http(s) URL within approved origin scope.",
+		parameters: Type.Object({
+			url: Type.String({ description: "Absolute http(s) URL" }),
+		}),
+		async execute(_id, params) {
+			const result = await controller.navigate(params.url);
+			return {
+				content: [{ type: "text", text: `navigated: ${result.url}` }],
+				details: result,
+			};
+		},
+	});
+
+	const browserClick = defineTool({
+		name: "browser_click",
+		label: "Click",
+		description:
+			"Click by ref and snapshot generation. Form submit and consequential controls are blocked for the human.",
+		parameters: Type.Object({ ref: Ref, generation: Generation }),
+		async execute(_id, params) {
+			const result = await controller.click(params.ref, params.generation);
+			if (!result.ok) {
+				return {
+					content: [{ type: "text", text: `blocked: ${result.blocked}` }],
+					details: result,
+				};
+			}
+			return { content: [{ type: "text", text: "clicked" }], details: result };
+		},
+	});
+
+	const browserFill = defineTool({
+		name: "browser_fill",
+		label: "Fill field",
+		description: "Fill a non-sensitive input by ref and snapshot generation.",
+		parameters: Type.Object({
+			ref: Ref,
+			generation: Generation,
+			text: Type.String(),
+		}),
+		async execute(_id, params) {
+			const result = await controller.fill(params.ref, params.generation, params.text);
+			if (!result.ok) {
+				return {
+					content: [{ type: "text", text: `blocked: ${result.blocked}` }],
+					details: result,
+				};
+			}
+			return { content: [{ type: "text", text: "filled" }], details: result };
+		},
+	});
+
+	const browserSelect = defineTool({
+		name: "browser_select",
+		label: "Select option",
+		description: "Select an option on a select element.",
+		parameters: Type.Object({
+			ref: Ref,
+			generation: Generation,
+			value: Type.String(),
+		}),
+		async execute(_id, params) {
+			const result = await controller.selectOption(params.ref, params.generation, params.value);
+			return { content: [{ type: "text", text: "selected" }], details: result };
+		},
+	});
+
+	const browserScroll = defineTool({
+		name: "browser_scroll",
+		label: "Scroll",
+		description: "Scroll the bound task tab up or down.",
+		parameters: Type.Object({
+			direction: Type.Union([Type.Literal("up"), Type.Literal("down")]),
+		}),
+		async execute(_id, params) {
+			await controller.scroll(params.direction);
+			return { content: [{ type: "text", text: `scrolled ${params.direction}` }], details: {} };
+		},
+	});
+
+	return [pageSnapshot, browserNavigate, browserClick, browserFill, browserSelect, browserScroll];
+}
