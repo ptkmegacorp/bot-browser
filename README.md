@@ -36,12 +36,15 @@ This:
 3. Opens or reuses the designated task tab at `http://127.0.0.1:9477/fixtures/welcome.html`
 4. Listens on `http://127.0.0.1:9477` with pairing token printed once at startup
 
-## Load extension (first run)
+## Extension (Agent Chrome profile)
 
-1. Open the **Agent** Chrome window started by the backend.
-2. Go to `chrome://extensions`, enable Developer mode, **Load unpacked** → `extension/` in this repo.
-3. Open the side panel from the extension action.
-4. Paste the pairing token from the backend log into the side panel and save.
+On **Google Chrome 137+**, `--load-extension` is ignored. The backend loads the repo’s `extension/` folder over CDP (`Extensions.loadUnpacked`) and passes `--enable-unsafe-extension-debugging`.
+
+1. Open the **Agent** Chrome window (puzzle icon → **Ubuntu Shared Browser Agent**).
+2. Open the side panel from that extension action.
+3. Paste the pairing token from the backend log into the side panel settings and save.
+
+If `chrome://extensions` looks empty on Chrome 154, that can be normal until the backend has run once. You can also use **Load unpacked** on `extension/` (Developer mode); restart via the desktop launcher afterward so CDP and the backend stay in sync.
 
 ## Tests
 

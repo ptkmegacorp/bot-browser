@@ -40,7 +40,7 @@ it.skipIf(process.env.USBA_E2E_PANEL !== "1")("real side panel reads and fills o
   await panel.locator('#tabList').selectOption(targetInfo.targetId);
   await panel.locator('#attachTab').click();
   await panel.evaluate(async()=>{ await (globalThis as any).refreshStatus();(globalThis as any).closeSettings(); });
-  await panel.locator('#model').selectOption('saturn::qwen3.8-27b-gsq-rco-iq2_xs-local');
+  await panel.locator('#model').selectOption('saturn::qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local');
   const text=await chat('Use page_snapshot to inspect the attached synthetic form. Tell me its page title and current name field value. Do not navigate, fill, or submit.');
   expect(text).toContain('Synthetic form');expect(text).toContain(marker);
   await chat(`Fill only the email field with ${email}. Leave the name unchanged. Do not submit or click buttons.`);

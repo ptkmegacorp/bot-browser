@@ -101,7 +101,7 @@ Routine configuration belongs in settings. A blocked task must still show an inl
 ## Verified local configuration
 - Ubuntu x86_64; `/usr/bin/google-chrome`, Chrome 154 installed.
 - Pi custom provider `saturn`: `http://100.80.6.1:8091/v1`.
-- Dev model: `qwen3.8-27b-gsq-rco-iq2_xs-local`, text input, 32768 context; API type `openai-completions`.
+- Dev model: `qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local`, text input, 32768 context; API type `openai-completions`.
 - Pi has an `openai-codex` OAuth credential in `~/.pi/agent/auth.json`. Credential existence does not establish current validity; verify through Pi at implementation time.
 - Model configuration: `~/.pi/agent/models.json`. Do not copy keys/tokens into this repo, extension, logs, or chat.
 

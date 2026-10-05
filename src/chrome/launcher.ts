@@ -6,12 +6,14 @@ import {
 	APP_NAME,
 	cdpUrl,
 	chromeExecutable,
+	chromeExtensionLaunchArgs,
 	chromeProfileDir,
 	DEFAULT_CDP_PORT,
 	DEFAULT_HTTP_HOST,
 	WM_CLASS,
 } from "../config.js";
 import { cdpHealthy, isPidAlive, listCdpPages } from "./cdp.js";
+import { ensureBundledExtensionLoaded } from "./extension-load.js";
 import { readChromeState, readOrCreatePairingToken, writeChromeState, type ChromeRuntimeState } from "./state.js";
 
 const FORBIDDEN_FLAGS = ["--headless", "--headless=new", "--headless=old", "--no-sandbox"];
@@ -82,6 +84,7 @@ function launchArgv(
 		"--no-first-run",
 		"--no-default-browser-check",
 		`--remote-debugging-port=${port}`,
+		...chromeExtensionLaunchArgs(),
 		url,
 		...extra,
 	];
@@ -179,6 +182,11 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 	if (prior && isPidAlive(prior.pid) && prior.cdpPort === port && (await cdpHealthy(base))) {
 		try {
 			await assertCdpOwnership(profile, port);
+			try {
+				await ensureBundledExtensionLoaded(port);
+			} catch {
+				/* ignore */
+			}
 			const tab = await pickOrCreateTaskTab(base, prior.taskTargetId, welcome);
 			const state: ChromeRuntimeState = {
 				...prior,
@@ -199,6 +207,11 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 		const pid = runningPids[0]!;
 		try {
 			await assertCdpOwnership(profile, port);
+			try {
+				await ensureBundledExtensionLoaded(port);
+			} catch {
+				/* ignore */
+			}
 			const tab = await pickOrCreateTaskTab(base, prior?.taskTargetId, welcome);
 			const state: ChromeRuntimeState = {
 				pid,
@@ -228,6 +241,12 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 	if (!cdpReady) {
 		return { ok: false, cdpReady: false, error: "cdp_not_ready" };
 	}
+
+	const extId = await ensureBundledExtensionLoaded(port).catch((err) => {
+		console.error("extension_load_failed:", err instanceof Error ? err.message : err);
+		return undefined;
+	});
+	if (extId) console.log(`Extension loaded: ${extId}`);
 
 	const tab = await pickOrCreateTaskTab(base, prior?.taskTargetId, welcome);
 	const state: ChromeRuntimeState = {
