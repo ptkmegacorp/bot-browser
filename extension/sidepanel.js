@@ -214,13 +214,22 @@ function updateContextBar() {
 	$("handoffDoneBtn").hidden = !showDone;
 }
 
+function focusComposer() {
+	const el = $("message");
+	if (!el || el.disabled) return;
+	el.focus();
+	const end = el.value.length;
+	if (typeof el.setSelectionRange === "function") {
+		el.setSelectionRange(end, end);
+	}
+}
+
 function updateComposerForMode() {
 	const running = state.mode === "running" || state.chatInFlight;
 	$("stopBtn").hidden = !running;
 	$("sendBtn").hidden = running;
 	const blocked = !state.agentEnabled || !state.tabAttached || state.connection !== "connected";
 	$("sendBtn").disabled = running || blocked;
-	$("message").disabled = running;
 }
 
 async function loadSettings() {
@@ -292,6 +301,22 @@ async function setAgentEnabled(enabled) {
 	await refreshStatus();
 }
 
+let activeTabSyncTimer = null;
+
+function requestActiveTabSync() {
+	if (activeTabSyncTimer != null) return;
+	activeTabSyncTimer = setTimeout(async () => {
+		activeTabSyncTimer = null;
+		if (state.bindingMode !== "follow_active" || state.connection !== "connected") return;
+		try {
+			const win = await chrome.windows.getCurrent();
+			chrome.runtime.sendMessage({ type: "sync_active_tab", windowId: win.id });
+		} catch {
+			/* ignore */
+		}
+	}, 300);
+}
+
 function disconnectEvents() {
 	state.eventAbort?.abort();
 	state.eventAbort = null;
@@ -317,6 +342,8 @@ async function connectEvents() {
 		state.connection = "connected";
 		setConnStatus(state.mode === "running" ? "Working" : "Connected", "ok");
 		hideInlineBanner();
+		updateComposerForMode();
+		requestActiveTabSync();
 		const reader = res.body.getReader();
 		const decoder = new TextDecoder();
 		let buffer = "";
@@ -461,6 +488,10 @@ async function refreshStatus() {
 		updatePermissionUi();
 		if (!state.chatInFlight) {
 			state.mode = data.mode ?? "idle";
+		} else if (data.mode === "idle" && state.mode !== "running") {
+			state.chatInFlight = false;
+			state.mode = "idle";
+			clearWorkingStatus();
 		}
 		state.connection = "connected";
 		setConnStatus(
@@ -468,6 +499,9 @@ async function refreshStatus() {
 			state.mode === "paused" || state.mode === "human_handoff" ? "warn" : "ok",
 		);
 		state.tabAttached = data.tabAttached === true;
+		if (!state.tabAttached && state.bindingMode === "follow_active" && state.connection === "connected") {
+			requestActiveTabSync();
+		}
 		populateModels(data.models ?? []);
 		updateTabSummary(data.taskTab, state.tabAttached);
 		renderOrigins(data.approvedOrigins ?? [], data.originPolicyMode ?? state.originPolicyMode);
@@ -718,6 +752,7 @@ $("composer").addEventListener("submit", async (e) => {
 	state.chatInFlight = true;
 	state.currentRunId = null;
 	updateComposerForMode();
+	focusComposer();
 	addUserMessage(draft);
 	beginAssistantStream();
 	setWorkingStatus("Starting…");
@@ -775,6 +810,7 @@ $("composer").addEventListener("submit", async (e) => {
 		state.chatInFlight = false;
 		await refreshStatus();
 		updateComposerForMode();
+		focusComposer();
 	}
 });
 
@@ -823,6 +859,13 @@ globalThis.refreshStatus = refreshStatus;
 globalThis.control = control;
 globalThis.openSettings = openSettings;
 globalThis.closeSettings = closeSettings;
+
+document.addEventListener("visibilitychange", () => {
+	if (document.visibilityState !== "visible") return;
+	refreshStatus();
+	requestActiveTabSync();
+	connectEvents();
+});
 
 loadSettings().then(async () => {
 	updateAgentSwitchUi();

@@ -107,6 +107,11 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 	await syncActiveTab(activeInfo.windowId, "activated");
 });
 
+chrome.windows.onFocusChanged.addListener(async (windowId) => {
+	if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+	await syncActiveTab(windowId, "focus");
+});
+
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 	if (tab.url && ELIGIBLE(tab.url)) {
 		await enableSidePanelForTab(tabId);

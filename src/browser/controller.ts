@@ -203,12 +203,26 @@ export class BrowserController {
 		if (this.mode === "running") this.setMode("idle");
 	}
 
+	private async ensurePlaywrightCdp(): Promise<BrowserContext> {
+		const stale =
+			!this.browser || this.browser.contexts().length === 0;
+		if (stale) {
+			this.page = null;
+			this.boundTargetId = null;
+			if (this.browser) {
+				await this.browser.close().catch(() => {});
+			}
+			this.browser = await chromium.connectOverCDP(cdpUrl(this.cdpPort));
+		}
+		const context = this.browser.contexts()[0] ?? null;
+		if (!context) throw new Error("no_browser_context");
+		this.context = context;
+		return context;
+	}
+
 	async connect(targetId: string): Promise<void> {
 		if (await this.isBoundTo(targetId)) return;
-		if (!this.browser) this.browser = await chromium.connectOverCDP(cdpUrl(this.cdpPort));
-		const contexts = this.browser.contexts();
-		this.context = contexts[0] ?? null;
-		if (!this.context) throw new Error("no_browser_context");
+		await this.ensurePlaywrightCdp();
 
 		const pages = this.context.pages();
 		let matched: Page | null = null;
