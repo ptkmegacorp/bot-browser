@@ -112,5 +112,31 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 		},
 	});
 
-	return [pageSnapshot, browserNavigate, browserClick, browserFill, browserSelect, browserScroll];
+	const browserScreenshot = defineTool({
+		name: "browser_screenshot",
+		label: "Screenshot",
+		description:
+			"Capture a PNG screenshot of the bound task tab. Blocked during pause/login handoff. Use page_snapshot for readable text and refs.",
+		parameters: Type.Object({}),
+		async execute() {
+			const shot = await controller.screenshot();
+			return {
+				content: [
+					{ type: "text", text: "screenshot captured" },
+					{ type: "image", data: shot.base64, mimeType: shot.mimeType },
+				],
+				details: { mimeType: shot.mimeType },
+			};
+		},
+	});
+
+	return [
+		pageSnapshot,
+		browserNavigate,
+		browserClick,
+		browserFill,
+		browserSelect,
+		browserScroll,
+		browserScreenshot,
+	];
 }

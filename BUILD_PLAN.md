@@ -106,7 +106,11 @@ Routine configuration belongs in settings. A blocked task must still show an inl
 - Model configuration: `~/.pi/agent/models.json`. Do not copy keys/tokens into this repo, extension, logs, or chat.
 
 ## Architecture
-- TypeScript/Node backend using the installed Pi SDK's model runtime and agent session; Playwright over loopback CDP for browser actions.
+- TypeScript/Node backend using the installed Pi SDK's model runtime and agent session.
+- **Browser engine (production):** `PlaywrightMcpEngine` — pinned `@playwright/mcp@0.0.83`, in-process MCP (`createConnection` + linked in-memory transport). CDP attach to Agent Chrome on loopback; exact-tab binding uses CDP target IDs (see `tab-resolve.ts` / adapter index mapping), not URL/title alone.
+- **Browser engine boundary:** `BrowserEngine` in `src/browser/engine.ts`; `BrowserController` owns authority, queueing, origin policy, safety preflight, and observation/ref provenance. Pi tools never call MCP directly.
+- **Tests:** `USBA_BROWSER_ENGINE=fake` selects `FakeBrowserEngine` in `createBrowserEngine`. Unit/integration tests that need a real DOM use `BrowserController.forTestingAttachPage` → `PlaywrightPageEngine` (legacy interactive collector in `element-registry.ts` / `snapshot.ts` — not used in production).
+- Optional engine regression: `npm run test:mcp-spike`, `npm run test:mcp-engine`; optional Saturn fixture walkthrough: `npm run test:saturn-e2e-verify` (requires running backend + Agent Chrome).
 - Manifest V3 extension: side-panel chat, attach/detach, pause/resume, attached-tab URL, model picker, progress/errors.
 - Reuse Pi model configuration/auth, including OAuth refresh, via `ModelRuntime`, not hand-written token extraction. OpenAI subscription auth is NOT a generic OpenAI API key; use Pi's `openai-codex` provider adapter.
 - Default dev model is Saturn Qwen. Offer authorized Pi models in the picker, including Codex. Additional OpenAI-compatible endpoints are configured through Pi `models.json`.
@@ -123,7 +127,7 @@ Routine configuration belongs in settings. A blocked task must still show an inl
 6. Do not auto-start an agent task. Show connected/idle, selected model, attached tab.
 
 ## Browser tools and control
-Tools: compact sanitized page snapshot, navigate, click, fill non-sensitive field, select option, scroll. Qwen is text-only: use DOM/accessibility-derived observations, not vision-dependent operation.
+Tools: page snapshot (readable text + refs from MCP), navigate, click, fill non-sensitive field, select option, scroll, optional PNG screenshot (`browser_screenshot`). Qwen is text-first: prefer snapshot text; screenshot is for models with image input when needed.
 
 Actions target the bound tab and current document generation; reject stale element handles. In default Follow active tab mode, selection changes update binding while idle; during runs they first cancel/pause work (see active-tab requirements above). In advanced Pin tab mode, foreground changes do not change binding. Closing the bound tab stops work. Popups/new tabs are never automatically task continuations, even if selected. Serialize mutations and bound step/time budgets.
 

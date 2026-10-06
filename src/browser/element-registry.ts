@@ -1,3 +1,7 @@
+/**
+ * Interactive element collection for PlaywrightPageEngine only (unit/e2e tests via
+ * BrowserController.forTestingAttachPage). Production uses Playwright MCP snapshots.
+ */
 import type { ElementHandle, Page } from "playwright";
 
 export interface RegisteredElement {

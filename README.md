@@ -1,6 +1,6 @@
 # Ubuntu Shared Browser Agent
 
-One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend drives the tab via Playwright over loopback CDP and runs a Pi SDK agent with browser-only tools.
+One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through **Playwright MCP** (`@playwright/mcp@0.0.83`, in-process MCP transport), and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`; upstream MCP supplies snapshots and actions.
 
 See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria. See [VERIFICATION.md](./VERIFICATION.md) for how to run automated and manual checks.
 
@@ -51,11 +51,16 @@ If `chrome://extensions` looks empty on Chrome 154, that can be normal until the
 ```bash
 npm test
 npm run build
+npm run test:mcp-spike       # Phase 0 spike (USBA_MCP_SPIKE=1); dedicated headless Chrome
+npm run test:mcp-engine      # PlaywrightMcpEngine + controller seam (USBA_MCP_ENGINE=1)
+npm run test:saturn-e2e-verify   # optional Saturn manual E2E: live Agent Chrome + Pi chat on fixtures
 npm run test:e2e-live        # optional: Pi model catalog (USBA_E2E_LIVE=1)
 npm run test:acceptance      # + real Pi/Qwen HTTP E2E (USBA_E2E_PI=1)
 npm run test:acceptance:codex  # Codex OAuth smoke (USBA_E2E_CODEX=1)
 npm run test:acceptance:panel  # open side panel + dedicated Chrome + real model; synthetic fixtures only
 ```
+
+See [VERIFICATION.md](./VERIFICATION.md) and [SPIKE_REPORT.md](./SPIKE_REPORT.md) for MCP transport choice, pinned version, and operational limits.
 
 ## Environment
 
@@ -64,6 +69,7 @@ npm run test:acceptance:panel  # open side panel + dedicated Chrome + real model
 | `USBA_PORT` | `9477` |
 | `USBA_HOST` | `127.0.0.1` |
 | `USBA_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
+| `USBA_BROWSER_ENGINE` | `playwright-mcp` (production). Set to `fake` for tests that inject `FakeBrowserEngine` via the controller constructor. |
 | `USBA_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
 
 ## License

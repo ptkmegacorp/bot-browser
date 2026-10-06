@@ -3,6 +3,7 @@ import { originFromUrl } from "./browser/origin-scope.js";
 import { ensureAgentChrome } from "./chrome/launcher.js";
 import { TabBindingStore } from "./browser/binding.js";
 import { BrowserController } from "./browser/controller.js";
+import { createBrowserEngine } from "./browser/create-engine.js";
 import { createAgentHost } from "./agent/session.js";
 import { createAppServer } from "./server/http.js";
 import { acquireInstanceLock } from "./server/instance-lock.js";
@@ -20,7 +21,8 @@ async function boot(): Promise<void> {
 	}
 
 	const bindings = new TabBindingStore();
-	const controller = new BrowserController(bindings, launch.state.cdpPort);
+	const engine = createBrowserEngine(launch.state.cdpPort);
+	const controller = new BrowserController(bindings, launch.state.cdpPort, engine);
 	bindings.syncFromChromeState(launch.state, 0);
 	await controller.connect(launch.state.taskTargetId);
 	const taskOrigin = originFromUrl(launch.state.taskUrl);

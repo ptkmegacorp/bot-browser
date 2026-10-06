@@ -16,6 +16,19 @@ export interface CdpPageTarget {
 	title: string;
 }
 
+/** Bring an exact Chrome page target to the foreground (CDP HTTP activate). */
+export async function activateCdpTarget(cdpBase: string, targetId: string): Promise<boolean> {
+	try {
+		const base = cdpBase.replace(/\/$/, "");
+		const res = await fetch(`${base}/json/activate/${encodeURIComponent(targetId)}`, {
+			signal: AbortSignal.timeout(5000),
+		});
+		return res.ok;
+	} catch {
+		return false;
+	}
+}
+
 export async function listCdpPages(cdpBase: string): Promise<CdpPageTarget[]> {
 	const res = await fetch(`${cdpBase.replace(/\/$/, "")}/json/list`, {
 		signal: AbortSignal.timeout(5000),

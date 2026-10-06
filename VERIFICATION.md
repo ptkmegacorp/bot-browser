@@ -9,6 +9,21 @@ npm test
 npm run build
 ```
 
+Playwright MCP integration (optional; dedicated headless Chrome, does not touch Agent profile):
+
+```bash
+npm run test:mcp-spike    # USBA_MCP_SPIKE=1
+npm run test:mcp-engine   # USBA_MCP_ENGINE=1
+```
+
+Production browser mechanics use `@playwright/mcp@0.0.83` via in-process MCP (`PlaywrightMcpEngine`). Override with `USBA_BROWSER_ENGINE=fake` only when injecting a test engine through `createBrowserEngine`.
+
+Optional Saturn walkthrough (live backend on `:9477`, Agent Chrome CDP `:9333`, synthetic fixtures):
+
+```bash
+node scripts/saturn-e2e-verify.mjs
+```
+
 Optional gates (require Pi auth, models, and/or a running Agent Chrome profile):
 
 | Command | What it exercises |

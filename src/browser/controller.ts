@@ -1,51 +1,85 @@
-import { chromium, type BrowserContext, type Page } from "playwright";
+import type { Page } from "playwright";
 import { cdpUrl } from "../config.js";
 import { listCdpPages } from "../chrome/cdp.js";
 import type { TabBindingStore } from "./binding.js";
-import { getCdpTargetId } from "./cdp-page.js";
-import { collectInteractiveElements, ElementRegistry } from "./element-registry.js";
+import type { BrowserEngine, EngineErrorCode, EngineOutcome } from "./engine.js";
+import { createBrowserEngine } from "./create-engine.js";
+import { PlaywrightPageEngine } from "./engines/playwright-page.js";
 import { OriginScope, originFromUrl } from "./origin-scope.js";
-import {
-	bumpDocumentGeneration,
-	buildSnapshotFromHandles,
-	currentDocumentGeneration,
-	MAX_SNAPSHOT_NODES,
-	type PageSnapshot,
-} from "./snapshot.js";
+import { bumpDocumentGeneration, currentDocumentGeneration, type PageSnapshot } from "./snapshot.js";
 import { isConsequentialControl, isSensitiveField } from "./safety.js";
 
 export type AgentControlMode = "idle" | "running" | "paused" | "human_handoff";
 
 interface SnapshotCache {
 	generation: number;
+	observationId: string;
+	bindingRevision: number;
 	refs: Set<string>;
 }
 
+function throwEngineFailure(outcome: { ok: false; code: EngineErrorCode; message?: string }): never {
+	const code = outcome.code;
+	if (code === "stale_observation" || code === "stale_ref") {
+		if (outcome.message?.includes("ref_element_missing")) {
+			throw new Error("ref_element_missing");
+		}
+		throw new Error(code === "stale_observation" ? "stale_snapshot_generation" : "stale_snapshot_generation");
+	}
+	if (code === "unknown_ref") throw new Error("unknown_ref");
+	if (code === "operation_cancelled") throw new Error("operation_cancelled");
+	if (code === "not_bound") throw new Error("no_tab_attached");
+	if (code === "target_unavailable") throw new Error("tab_not_attached");
+	if (code === "invalid_argument" && outcome.message?.includes("not_a_select")) {
+		throw new Error("not_a_select");
+	}
+	if (code === "invalid_argument" && outcome.message?.includes("ambiguous_tab_match")) {
+		throw new Error("ambiguous_tab_match");
+	}
+	throw new Error(outcome.message ?? code);
+}
+
+function assertEngineOk<T>(outcome: EngineOutcome<T>): T {
+	if (!outcome.ok) throwEngineFailure(outcome);
+	return outcome.data;
+}
+
 export class BrowserController {
-	private browser: Awaited<ReturnType<typeof chromium.connectOverCDP>> | null = null;
-	private context: BrowserContext | null = null;
-	private page: Page | null = null;
+	private engine: BrowserEngine;
 	private boundTargetId: string | null = null;
 	private actionQueue: Promise<void> = Promise.resolve();
 	private mode: AgentControlMode = "idle";
 	private snapshotCache: SnapshotCache | null = null;
 	private snapshotGeneration = 0;
 	private operationEpoch = 0;
-	private readonly elementRegistry = new ElementRegistry();
 	private testMode = false;
 	private testHold: (() => Promise<void>) | null = null;
+	private pageEngine: PlaywrightPageEngine | null = null;
+	private testPage: Page | null = null;
+	private testBindReady: Promise<void> = Promise.resolve();
 	private agentEnabled = true;
 	readonly originScope = new OriginScope();
 
 	forTestingHoldSnapshot(hold: () => Promise<void>): void {
 		this.testHold = hold;
+		this.pageEngine?.forTestingHoldObserve(hold);
+	}
+
+	/** Attach a fake or stub engine binding without CDP (unit tests). */
+	forTestingBindTarget(targetId: string): void {
+		this.testMode = true;
+		this.boundTargetId = targetId;
+		this.bindings.setTarget(targetId, currentDocumentGeneration());
 	}
 
 	forTestingAttachPage(page: Page): void {
 		this.testMode = true;
-		this.page = page;
+		this.testPage = page;
+		this.pageEngine = new PlaywrightPageEngine(page);
+		this.engine = this.pageEngine;
 		this.boundTargetId = "test";
 		this.bindings.setTarget("test", currentDocumentGeneration());
+		this.testBindReady = this.pageEngine.bind("test").then(() => undefined);
 		page.on("framenavigated", (frame) => {
 			if (frame === page.mainFrame()) this.invalidateObservations();
 		});
@@ -54,15 +88,19 @@ export class BrowserController {
 	constructor(
 		private readonly bindings: TabBindingStore,
 		private readonly cdpPort: number,
-	) {}
+		engine?: BrowserEngine,
+	) {
+		this.engine = engine ?? createBrowserEngine(cdpPort);
+	}
 
 	getMode(): AgentControlMode {
 		return this.mode;
 	}
 
 	getAttachedTabUrl(): string | null {
-		if (!this.page || !this.boundTargetId) return null;
-		return this.page.url();
+		if (!this.boundTargetId) return null;
+		if (this.testMode && this.testPage) return this.testPage.url();
+		return null;
 	}
 
 	getBoundTargetId(): string | null {
@@ -70,7 +108,7 @@ export class BrowserController {
 	}
 
 	isTabAttached(): boolean {
-		return !!(this.page && this.boundTargetId);
+		return !!this.boundTargetId;
 	}
 
 	setAgentEnabled(enabled: boolean): void {
@@ -86,7 +124,6 @@ export class BrowserController {
 	}
 
 	private clearBinding(): void {
-		this.page = null;
 		this.boundTargetId = null;
 		this.bindings.clear();
 	}
@@ -98,35 +135,40 @@ export class BrowserController {
 		url: string | null;
 		title: string | null;
 	}> {
-		if (this.testMode && this.page && this.boundTargetId) {
-			const title = await this.page.title().catch(() => "");
-			return {
-				attached: true,
-				targetId: this.boundTargetId,
-				url: this.page.url(),
-				title,
-			};
-		}
-		if (!this.page || !this.boundTargetId) {
-			return { attached: false, targetId: null, url: null, title: null };
-		}
-		try {
-			const id = await getCdpTargetId(this.page);
-			if (id !== this.boundTargetId) {
+		if (this.testMode && this.pageEngine && this.boundTargetId) {
+			await this.testBindReady;
+			const state = await this.pageEngine.getBindingState();
+			if (!state.live) {
 				this.clearBinding();
 				return { attached: false, targetId: null, url: null, title: null };
 			}
+			return {
+				attached: true,
+				targetId: this.boundTargetId,
+				url: state.url,
+				title: state.title,
+			};
+		}
+		if (!this.boundTargetId) {
+			return { attached: false, targetId: null, url: null, title: null };
+		}
+		const state = await this.engine.getBindingState();
+		if (!state.live || state.targetId !== this.boundTargetId) {
+			this.clearBinding();
+			return { attached: false, targetId: null, url: null, title: null };
+		}
+		try {
 			const pages = await listCdpPages(cdpUrl(this.cdpPort));
-			const meta = pages.find((p) => p.id === id);
+			const meta = pages.find((p) => p.id === this.boundTargetId);
 			if (!meta) {
 				this.clearBinding();
 				return { attached: false, targetId: null, url: null, title: null };
 			}
 			return {
 				attached: true,
-				targetId: id,
-				url: this.page.url(),
-				title: meta.title ?? "",
+				targetId: this.boundTargetId,
+				url: state.url ?? meta.url,
+				title: state.title ?? meta.title ?? "",
 			};
 		} catch {
 			this.clearBinding();
@@ -140,7 +182,6 @@ export class BrowserController {
 
 	invalidateObservations(): void {
 		this.snapshotCache = null;
-		this.elementRegistry.clear();
 		bumpDocumentGeneration();
 		this.bumpOperationEpoch();
 	}
@@ -148,6 +189,7 @@ export class BrowserController {
 	drainQueuedWork(): void {
 		this.bumpOperationEpoch();
 		this.actionQueue = Promise.resolve();
+		this.engine.cancel();
 	}
 
 	private bumpOperationEpoch(): void {
@@ -163,37 +205,31 @@ export class BrowserController {
 		if (!this.observationsAllowed()) throw new Error("observations_paused");
 	}
 
-	private assertOriginForPage(page: Page): void {
+	private async assertOriginForUrl(url: string): Promise<void> {
 		if (this.testMode) return;
-		const origin = originFromUrl(page.url());
+		const origin = originFromUrl(url);
 		if (!origin) throw new Error("invalid_url");
-		const check = this.originScope.validateNavigation(page.url());
+		const check = this.originScope.validateNavigation(url);
 		if (!check.ok) throw new Error(check.reason);
 	}
 
-	private async isBoundTo(targetId: string): Promise<boolean> {
-		if (!this.page || this.boundTargetId !== targetId) return false;
-		try {
-			const id = await getCdpTargetId(this.page);
-			return id === targetId;
-		} catch {
-			return false;
-		}
-	}
-
 	async attachTab(targetId: string): Promise<{ url: string; targetId: string }> {
-		if (this.testMode) {
+		if (this.testMode && this.pageEngine) {
 			this.boundTargetId = targetId;
+			await this.pageEngine.bind(targetId);
 			this.bindings.setTarget(targetId, currentDocumentGeneration());
-			return { url: this.page?.url() ?? "", targetId };
+			const state = await this.pageEngine.getBindingState();
+			return { url: state.url ?? "", targetId };
 		}
-		if (await this.isBoundTo(targetId)) {
-			const page = await this.assertBoundPage();
-			return { url: page.url(), targetId };
+		if (this.boundTargetId === targetId) {
+			const state = await this.engine.getBindingState();
+			if (state.live && state.targetId === targetId) {
+				return { url: state.url ?? "", targetId };
+			}
 		}
 		await this.connect(targetId);
-		const page = await this.assertBoundPage();
-		return { url: page.url(), targetId };
+		const state = await this.engine.getBindingState();
+		return { url: state.url ?? "", targetId };
 	}
 
 	detachAgent(): void {
@@ -203,80 +239,54 @@ export class BrowserController {
 		if (this.mode === "running") this.setMode("idle");
 	}
 
-	private async ensurePlaywrightCdp(): Promise<BrowserContext> {
-		const stale =
-			!this.browser || this.browser.contexts().length === 0;
-		if (stale) {
-			this.page = null;
-			this.boundTargetId = null;
-			if (this.browser) {
-				await this.browser.close().catch(() => {});
-			}
-			this.browser = await chromium.connectOverCDP(cdpUrl(this.cdpPort));
-		}
-		const context = this.browser.contexts()[0] ?? null;
-		if (!context) throw new Error("no_browser_context");
-		this.context = context;
-		return context;
-	}
-
 	async connect(targetId: string): Promise<void> {
-		if (await this.isBoundTo(targetId)) return;
-		await this.ensurePlaywrightCdp();
-
-		const pages = this.context.pages();
-		let matched: Page | null = null;
-		for (const page of pages) {
-			try {
-				const id = await getCdpTargetId(page);
-				if (id === targetId) {
-					matched = page;
-					break;
-				}
-			} catch {
-				/* try next */
-			}
+		if (this.testMode && this.pageEngine) {
+			assertEngineOk(await this.pageEngine.bind(targetId));
+			this.boundTargetId = targetId;
+			this.bindings.setTarget(targetId, currentDocumentGeneration());
+			return;
 		}
-		if (!matched) {
-			const meta = (await listCdpPages(cdpUrl(this.cdpPort))).find((p) => p.id === targetId);
-			if (!meta) throw new Error("unknown_tab");
-			throw new Error("tab_not_attached");
+		if (this.boundTargetId === targetId) {
+			const state = await this.engine.getBindingState();
+			if (state.live && state.targetId === targetId) return;
 		}
 
-		this.page = matched;
+		const meta = (await listCdpPages(cdpUrl(this.cdpPort))).find((p) => p.id === targetId);
+		if (!meta) throw new Error("unknown_tab");
+
+		const bound = await this.engine.bind(targetId);
+		if (!bound.ok) {
+			if (bound.code === "target_unavailable") throw new Error("tab_not_attached");
+			throwEngineFailure(bound);
+		}
+
 		this.boundTargetId = targetId;
-		this.page.on("close", () => {
-			this.page = null;
-			this.boundTargetId = null;
-			this.bindings.clear();
-			this.invalidateObservations();
-		});
-		this.page.on("framenavigated", (frame) => {
-			if (frame === this.page?.mainFrame()) {
-				this.invalidateObservations();
-			}
-		});
-
 		this.bindings.setTarget(targetId, currentDocumentGeneration());
 	}
 
-	private async assertBoundPage(): Promise<Page> {
-		if (this.testMode && this.page) return this.page;
-		if (!this.page || !this.boundTargetId) throw new Error("no_tab_attached");
-		const id = await getCdpTargetId(this.page);
-		if (id !== this.boundTargetId) throw new Error("stale_tab_binding");
-		return this.page;
+	private async assertBound(): Promise<void> {
+		if (this.testMode) {
+			await this.testBindReady;
+			if (!this.boundTargetId) throw new Error("no_tab_attached");
+			return;
+		}
+		if (!this.boundTargetId) throw new Error("no_tab_attached");
+		const state = await this.engine.getBindingState();
+		if (!state.live || state.targetId !== this.boundTargetId) {
+			throw new Error("stale_tab_binding");
+		}
 	}
 
-	private async withPage<T>(fn: (page: Page) => Promise<T>): Promise<T> {
+	private async withBound<T>(fn: () => Promise<T>): Promise<T> {
 		this.assertObservationsAllowed();
-		const page = await this.assertBoundPage();
-		this.assertOriginForPage(page);
+		await this.assertBound();
+		const state = await this.engine.getBindingState();
+		await this.assertOriginForUrl(state.url ?? "about:blank");
 		if (!this.testMode) {
 			const binding = this.bindings.get();
 			if (!binding) throw new Error("no_tab_binding");
 		}
-		return fn(page);
+		return fn();
 	}
 
 	private enqueue<T>(fn: (epoch: number) => Promise<T>): Promise<T> {
@@ -304,6 +314,41 @@ export class BrowserController {
 		}
 	}
 
+	private refContext(generation: number): {
+		observationId: string;
+		generation: number;
+		bindingRevision: number;
+	} {
+		if (!this.snapshotCache || this.snapshotCache.generation !== generation) {
+			throw new Error("stale_snapshot_generation");
+		}
+		return {
+			observationId: this.snapshotCache.observationId,
+			generation: this.snapshotCache.generation,
+			bindingRevision: this.snapshotCache.bindingRevision,
+		};
+	}
+
+	private observationToPageSnapshot(obs: {
+		url: string;
+		title: string;
+		generation: number;
+		refs: Array<{ ref: string; role: string; name: string; value?: string; editable?: boolean }>;
+	}): PageSnapshot {
+		return {
+			url: obs.url,
+			title: obs.title,
+			generation: obs.generation,
+			nodes: obs.refs.map((n) => ({
+				ref: n.ref,
+				role: n.role,
+				name: n.name,
+				value: n.value,
+				editable: n.editable,
+			})),
+		};
+	}
+
 	async snapshot(): Promise<PageSnapshot> {
 		if (!this.observationsAllowed()) throw new Error("observations_paused");
 		return this.enqueue(async (epoch) => {
@@ -312,40 +357,37 @@ export class BrowserController {
 				throw new Error("observations_paused");
 			}
 			this.assertObservationsAllowed();
-			const page = await this.assertBoundPage();
-			this.assertOriginForPage(page);
+			await this.assertBound();
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 
-			this.snapshotGeneration += 1;
-			const generation = this.snapshotGeneration;
-			this.elementRegistry.clear();
-			const handles = await collectInteractiveElements(page, MAX_SNAPSHOT_NODES);
-			for (let i = 0; i < handles.length; i++) {
-				this.elementRegistry.set(`e${i + 1}`, generation, handles[i]!);
-			}
-			const snap = await buildSnapshotFromHandles(page, generation, handles);
-
-			if (!this.observationsAllowed() || epoch !== this.operationEpoch) {
+			const outcome = await this.engine.observe();
+			if (epoch !== this.operationEpoch || !this.observationsAllowed()) {
 				throw new Error("observations_paused");
 			}
+			const obs = assertEngineOk(outcome);
+			await this.assertOriginForUrl(obs.url);
 
+			this.snapshotGeneration = obs.generation;
 			this.snapshotCache = {
-				generation: snap.generation,
-				refs: new Set(snap.nodes.map((n) => n.ref)),
+				generation: obs.generation,
+				observationId: obs.observationId,
+				bindingRevision: obs.bindingRevision,
+				refs: new Set(obs.refs.map((r) => r.ref)),
 			};
-			return snap;
+			return this.observationToPageSnapshot(obs);
 		});
 	}
 
 	async navigate(url: string): Promise<{ url: string }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
-			return this.withPage(async (page) => {
+			return this.withBound(async () => {
 				const check = this.originScope.validateNavigation(url);
 				if (!check.ok) throw new Error(check.reason);
-				const before = page.url();
-				await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30_000 });
-				const after = page.url();
+				const state = await this.engine.getBindingState();
+				const before = state.url ?? "";
+				const outcome = await this.engine.navigate(url);
+				const after = assertEngineOk(outcome).url;
 				const redirect = this.originScope.checkRedirect(before, after);
 				if (!redirect.ok) throw new Error(redirect.reason);
 				this.invalidateObservations();
@@ -357,29 +399,15 @@ export class BrowserController {
 	async click(ref: string, generation: number): Promise<{ ok: boolean; blocked?: string }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
-			return this.withPage(async () => {
+			return this.withBound(async () => {
 				this.validateRef(generation, ref);
-				const handle = await this.elementRegistry.resolveConnected(ref, generation);
-				const desc = await handle.evaluate((el) => {
-					const tag = el.tagName.toLowerCase();
-					const type = el.getAttribute("type");
-					const role = el.getAttribute("role");
-					const formId = el.getAttribute("form");
-					let inForm = false;
-					if ("form" in el && (el as HTMLButtonElement).form) inForm = true;
-					else if (formId && document.getElementById(formId)) inForm = true;
-					else if (el.closest("form")) inForm = true;
-					const label =
-						el.getAttribute("aria-label") ||
-						(el.textContent ?? "").trim() ||
-						el.getAttribute("value") ||
-						"";
-					return { tag, type, role, inForm, label };
-				});
+				const ctx = this.refContext(generation);
+				const descOutcome = await this.engine.describeControl(ref, ctx);
+				const desc = assertEngineOk(descOutcome);
 				if (isConsequentialControl(desc)) {
 					return { ok: false, blocked: "risky_click_requires_human" };
 				}
-				await handle.click({ timeout: 10_000 });
+				assertEngineOk(await this.engine.click(ref, ctx));
 				this.invalidateObservations();
 				return { ok: true };
 			});
@@ -389,18 +417,15 @@ export class BrowserController {
 	async fill(ref: string, generation: number, text: string): Promise<{ ok: boolean; blocked?: string }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
-			return this.withPage(async () => {
+			return this.withBound(async () => {
 				this.validateRef(generation, ref);
-				const handle = await this.elementRegistry.resolveConnected(ref, generation);
-				const meta = await handle.evaluate((el) => ({
-					type: el.getAttribute("type"),
-					autocomplete: el.getAttribute("autocomplete"),
-					name: el.getAttribute("name"),
-				}));
-				if (isSensitiveField(meta.type, meta.autocomplete, meta.name)) {
+				const ctx = this.refContext(generation);
+				const descOutcome = await this.engine.describeControl(ref, ctx);
+				const desc = assertEngineOk(descOutcome);
+				if (isSensitiveField(desc.type, desc.autocomplete ?? null, desc.name ?? null)) {
 					return { ok: false, blocked: "sensitive_field_human_only" };
 				}
-				await handle.fill(text);
+				assertEngineOk(await this.engine.fill(ref, ctx, text));
 				return { ok: true };
 			});
 		});
@@ -409,12 +434,11 @@ export class BrowserController {
 	async selectOption(ref: string, generation: number, value: string): Promise<{ ok: boolean }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
-			return this.withPage(async () => {
+			return this.withBound(async () => {
 				this.validateRef(generation, ref);
-				const handle = await this.elementRegistry.resolveConnected(ref, generation);
-				const tag = await handle.evaluate((el) => el.tagName.toLowerCase());
-				if (tag !== "select") throw new Error("not_a_select");
-				await handle.selectOption(value);
+				const ctx = this.refContext(generation);
+				assertEngineOk(await this.engine.selectOption(ref, ctx, value));
+				this.invalidateObservations();
 				return { ok: true };
 			});
 		});
@@ -423,20 +447,24 @@ export class BrowserController {
 	async scroll(direction: "up" | "down"): Promise<{ ok: boolean }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
-			return this.withPage(async (page) => {
-				const delta = direction === "down" ? 600 : -600;
-				await page.mouse.wheel(0, delta);
+			return this.withBound(async () => {
+				assertEngineOk(await this.engine.scroll(direction));
 				return { ok: true };
 			});
 		});
 	}
 
+	async screenshot(): Promise<{ mimeType: "image/png"; base64: string }> {
+		return this.enqueue(async (epoch) => {
+			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
+			return this.withBound(async () => {
+				return assertEngineOk(await this.engine.screenshot());
+			});
+		});
+	}
+
 	async dispose(): Promise<void> {
-		this.elementRegistry.clear();
-		this.page = null;
-		this.context = null;
+		await this.engine.dispose();
 		this.boundTargetId = null;
-		await this.browser?.close().catch(() => {});
-		this.browser = null;
 	}
 }

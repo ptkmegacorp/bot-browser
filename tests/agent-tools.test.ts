@@ -6,8 +6,16 @@ import { TabBindingStore } from "../src/browser/binding.js";
 it("activates exactly browser tools, never coding tools", async () => {
  const host = await createAgentHost(new BrowserController(new TabBindingStore(), 9333));
  try {
-  expect(host.session.getActiveToolNames().sort()).toEqual([
-   "page_snapshot", "browser_navigate", "browser_click", "browser_fill", "browser_select", "browser_scroll",
-  ].sort());
+  expect(host.session.getActiveToolNames().sort()).toEqual(
+   [
+    "page_snapshot",
+    "browser_navigate",
+    "browser_click",
+    "browser_fill",
+    "browser_select",
+    "browser_scroll",
+    "browser_screenshot",
+   ].sort(),
+  );
  } finally { await host.dispose(); }
 });
