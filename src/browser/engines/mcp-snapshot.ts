@@ -53,3 +53,54 @@ export function findSnapshotLineForRef(snapshot: string, ref: string): string | 
 	}
 	return undefined;
 }
+
+const SENSITIVE_VALUE_LINE =
+	/\b(one-time-code|current-password|new-password|cc-number|cc-csc|password)\b/i;
+
+/** Strip cross-tab metadata and mask sensitive field values before exposing text to Pi. */
+export function sanitizeMcpSnapshotForPi(raw: string): string {
+	let text = raw;
+	const openTabs = text.indexOf("### Open tabs");
+	const pageSection = text.indexOf("### Page");
+	if (openTabs >= 0 && pageSection > openTabs) {
+		text = text.slice(0, openTabs).trimEnd() + "\n\n" + text.slice(pageSection);
+	}
+
+	const lines = text.split("\n").map((line) => {
+		const isSensitiveLine =
+			SENSITIVE_VALUE_LINE.test(line) ||
+			/\btextbox\b/i.test(line) &&
+				(/\bone-time-code\b/i.test(line) || /\bSecret\b/i.test(line) || /\botp\b/i.test(line));
+		if (!isSensitiveLine) return line;
+		if (/\bvalue:\s*/i.test(line)) {
+			return line.replace(/\bvalue:\s*"[^"]*"/gi, 'value: "[masked]"');
+		}
+		if (/\[ref=[^\]]+\]:/.test(line)) {
+			return line.replace(/(\[ref=[^\]]+\]:\s*)\S+/g, "$1[masked]");
+		}
+		return line.replace(/:\s*\d{4,}\s*$/, ": [masked]");
+	});
+	return lines.join("\n");
+}
+
+/** Bounded readable transcript from the YAML snapshot body (not raw Open tabs). */
+export function extractReadableTranscript(sanitized: string, maxChars = 8000): string {
+	const start = sanitized.indexOf("### Snapshot");
+	const chunk = start >= 0 ? sanitized.slice(start) : sanitized;
+	const yaml = chunk.replace(/^### Snapshot\s*/m, "").replace(/^```yaml\s*/m, "").replace(/```\s*$/m, "");
+	const lines: string[] = [];
+	for (const line of yaml.split("\n")) {
+		const trimmed = line.trim();
+		if (!trimmed || trimmed.startsWith("-") === false) continue;
+		const afterRef = trimmed.match(/\[ref=[^\]]+\]:\s*(.+)$/);
+		if (afterRef?.[1]) {
+			lines.push(afterRef[1].trim());
+			continue;
+		}
+		const quoted = trimmed.match(/"([^"]+)"/);
+		if (quoted?.[1]) lines.push(quoted[1]);
+	}
+	const joined = lines.filter(Boolean).join("\n");
+	if (joined.length <= maxChars) return joined;
+	return joined.slice(0, maxChars) + "\n…";
+}

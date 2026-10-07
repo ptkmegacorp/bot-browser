@@ -14,6 +14,8 @@ export interface PageSnapshot {
 	title: string;
 	generation: number;
 	nodes: SnapshotNode[];
+	/** Sanitized readable page text for Pi (no Open tabs list; sensitive values masked). */
+	readableText?: string;
 }
 
 export const MAX_SNAPSHOT_NODES = 200;

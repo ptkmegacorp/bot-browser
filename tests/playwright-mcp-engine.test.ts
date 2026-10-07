@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,6 +8,7 @@ import { BrowserController } from "../src/browser/controller.js";
 import { FakeBrowserEngine } from "../src/browser/engines/fake-engine.js";
 import { PlaywrightMcpEngine } from "../src/browser/engines/playwright-mcp.js";
 import { PLAYWRIGHT_MCP_VERSION } from "../src/browser/engines/mcp-client.js";
+import { readMainBodyTextForCdpTarget } from "../src/browser/engines/cdp-target-page.js";
 import {
 	launchDedicatedCdpBrowser,
 	listCdpTargets,
@@ -26,25 +27,28 @@ async function openSameUrlTab(sessionBrowser: Browser, marker: string) {
 			await route.fulfill({
 				status: 200,
 				contentType: "text/html",
-				body: `<!doctype html><title>dup</title><body><p>${marker}</p></body>`,
+				body: `<!doctype html><title>dup</title><body><p>loading</p></body>`,
 			});
 			return;
 		}
 		await route.continue();
 	});
 	await page.goto(`${SPIKE_ORIGIN}${DUP_PATH}`);
+	await page.evaluate((m) => {
+		document.body.innerHTML = `<p>${m}</p>`;
+	}, marker);
 }
 
 describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (USBA_MCP_ENGINE=1)", () => {
 	let session: DedicatedCdpSession;
 	let outputDir: string;
 
-	beforeAll(async () => {
+	beforeEach(async () => {
 		session = await launchDedicatedCdpBrowser();
 		outputDir = await mkdtemp(join(tmpdir(), "usba-mcp-engine-out-"));
 	});
 
-	afterAll(async () => {
+	afterEach(async () => {
 		await session?.cleanup();
 		if (outputDir) await rm(outputDir, { recursive: true, force: true }).catch(() => {});
 	});
@@ -59,25 +63,33 @@ describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (USBA_MCP_ENGINE=1)", 
 		const fullUrl = `${SPIKE_ORIGIN}${DUP_PATH}`;
 		await openSameUrlTab(session.browser, "ENGINE_TAB_ALPHA");
 		await openSameUrlTab(session.browser, "ENGINE_TAB_BETA");
-		const targets = (await listCdpTargets(session.cdpEndpoint)).filter((t) => t.url === fullUrl);
+		const targets = (await listCdpTargets(session.cdpEndpoint)).filter((t) => t.url.includes(DUP_PATH));
 		expect(targets.length).toBeGreaterThanOrEqual(2);
-		const [targetA, targetB] = targets.slice(-2);
+		const withMarkers = await Promise.all(
+			targets.map(async (t) => ({
+				t,
+				body: (await readMainBodyTextForCdpTarget(session.cdpEndpoint, t.id)) ?? "",
+			})),
+		);
+		const targetA = withMarkers.find((x) => x.body.includes("ENGINE_TAB_ALPHA"))?.t;
+		const targetB = withMarkers.find((x) => x.body.includes("ENGINE_TAB_BETA"))?.t;
+		expect(targetA?.id && targetB?.id).toBeTruthy();
 
 		const engine = new PlaywrightMcpEngine({ cdpUrl: session.cdpEndpoint, outputDir });
 		try {
-			expect((await engine.bind(targetA!.id)).ok).toBe(true);
+			const bindA = await engine.bind(targetA!.id);
+			expect(bindA.ok, bindA.ok ? "" : JSON.stringify(bindA)).toBe(true);
 			const snapA = await engine.observe();
 			expect(snapA.ok).toBe(true);
 			if (!snapA.ok) return;
-			expect(snapA.data.bodyText).toMatch(/ENGINE_TAB_(ALPHA|BETA)/);
-			const markerA = snapA.data.bodyText.includes("ENGINE_TAB_ALPHA") ? "ALPHA" : "BETA";
+			expect(snapA.data.bodyText).toContain("ENGINE_TAB_ALPHA");
 
 			expect((await engine.bind(targetB!.id)).ok).toBe(true);
 			const snapB = await engine.observe();
 			expect(snapB.ok).toBe(true);
 			if (!snapB.ok) return;
-			const markerB = snapB.data.bodyText.includes("ENGINE_TAB_ALPHA") ? "ALPHA" : "BETA";
-			expect(markerA).not.toBe(markerB);
+			expect(snapB.data.bodyText).toContain("ENGINE_TAB_BETA");
+			expect(snapB.data.bodyText).not.toContain("ENGINE_TAB_ALPHA");
 		} finally {
 			await engine.dispose();
 		}

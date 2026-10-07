@@ -37,6 +37,21 @@ export function mcpToolText(result: CallToolResult): string {
 		.join("\n");
 }
 
+/** Extract JSON payload from Playwright MCP browser_evaluate tool output. */
+export function parseMcpEvaluateJson(text: string): string {
+	const match = text.match(/### Result\s*\n([\s\S]*?)(?:\n###|$)/);
+	const chunk = (match?.[1] ?? text).trim();
+	if (!chunk) return text.trim();
+	if (chunk.startsWith('"')) {
+		try {
+			return JSON.parse(chunk) as string;
+		} catch {
+			return chunk;
+		}
+	}
+	return chunk;
+}
+
 export function mcpToolImageBase64(result: CallToolResult): string | null {
 	for (const c of result.content ?? []) {
 		if (c.type === "image" && "data" in c && typeof c.data === "string") {

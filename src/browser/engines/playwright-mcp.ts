@@ -22,10 +22,16 @@ import {
 	mcpConfigForCdpEndpoint,
 	mcpToolImageBase64,
 	mcpToolText,
+	parseMcpEvaluateJson,
 	PLAYWRIGHT_MCP_VERSION,
 	type McpClientSession,
 } from "./mcp-client.js";
-import { findSnapshotLineForRef, parseSnapshotHeader, parseSnapshotRefs } from "./mcp-snapshot.js";
+import {
+	extractReadableTranscript,
+	parseSnapshotHeader,
+	parseSnapshotRefs,
+	sanitizeMcpSnapshotForPi,
+} from "./mcp-snapshot.js";
 
 export interface PlaywrightMcpEngineOptions {
 	cdpUrl: string;
@@ -224,9 +230,11 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 			}
 
 			const raw = truncateObservationText(mcpToolText(result));
-			this.lastSnapshotRaw = raw;
-			const header = parseSnapshotHeader(raw, this.boundUrl ?? "", this.boundTitle ?? "");
-			const refs = parseSnapshotRefs(raw);
+			const sanitized = sanitizeMcpSnapshotForPi(raw);
+			this.lastSnapshotRaw = sanitized;
+			const header = parseSnapshotHeader(sanitized, this.boundUrl ?? "", this.boundTitle ?? "");
+			const refs = parseSnapshotRefs(sanitized);
+			const readable = extractReadableTranscript(sanitized);
 
 			this.observationSeq += 1;
 			const observation: EngineObservation = {
@@ -236,7 +244,7 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 				title: header.title,
 				generation: this.observationSeq,
 				bindingRevision: this.bindingRevision,
-				bodyText: raw,
+				bodyText: readable.length > 0 ? readable : sanitized,
 				refs,
 			};
 			this.lastObservation = observation;
@@ -257,9 +265,12 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 			if (result.isError) {
 				return this.fail("timeout", mcpToolText(result) || "navigation failed");
 			}
-			this.boundUrl = url;
+			const pages = await listCdpPages(this.options.cdpUrl);
+			const meta = pages.find((p) => p.id === this.targetId);
+			const actualUrl = meta?.url ?? url;
+			this.boundUrl = actualUrl;
 			this.invalidateObservations();
-			return { ok: true, data: { url } };
+			return { ok: true, data: { url: actualUrl } };
 		});
 	}
 
@@ -316,11 +327,15 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 			const client = await this.ensureSession();
 			const tab = await this.ensureTargetSelected(client, this.targetId);
 			if (!tab.ok) return tab;
-			const deltaY = direction === "down" ? 600 : -600;
-			const result = await mcpCallTool(client, "browser_mouse_wheel", { deltaY }, signal);
+			const key = direction === "down" ? "PageDown" : "PageUp";
+			const result = await mcpCallTool(client, "browser_press_key", { key }, signal);
 			if (signal.aborted || epoch !== this.operationEpoch) return this.fail("operation_cancelled");
 			if (result.isError) {
-				return this.fail("timeout", mcpToolText(result) || "scroll failed");
+				const msg = mcpToolText(result) || "scroll failed";
+				if (/not found/i.test(msg)) {
+					return this.fail("not_implemented", msg);
+				}
+				return this.fail("timeout", msg);
 			}
 			return { ok: true, data: { scrolled: true } };
 		});
@@ -350,31 +365,6 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 		const check = this.validateRef(ctx, ref);
 		if (!check.ok) return check;
 
-		const line = this.lastSnapshotRaw ? findSnapshotLineForRef(this.lastSnapshotRaw, ref) : undefined;
-		if (line) {
-			const roleMatch = line.match(/^\s*-\s+(\w+)/);
-			const nameMatch = line.match(/"([^"]*)"/);
-			const role = roleMatch?.[1] ?? "element";
-			const label = nameMatch?.[1] ?? "";
-			const tag =
-				role === "button" ? "button" : role === "link" ? "a" : role === "textbox" ? "input" : role;
-			let inForm = false;
-			if (this.lastSnapshotRaw) {
-				const lines = this.lastSnapshotRaw.split("\n");
-				const idx = lines.findIndex((l) => l.includes(`[ref=${ref}]`));
-				for (let i = idx - 1; i >= 0 && i >= idx - 8; i--) {
-					if (/^\s*-\s+form\b/i.test(lines[i]!)) {
-						inForm = true;
-						break;
-					}
-				}
-			}
-			return {
-				ok: true,
-				data: { tag, type: null, role, inForm, label },
-			};
-		}
-
 		return this.enqueue(async (epoch, signal) => {
 			const client = await this.ensureSession();
 			const tab = await this.ensureTargetSelected(client, this.targetId!);
@@ -382,14 +372,18 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 			const result = await mcpCallTool(
 				client,
 				"browser_evaluate",
-				{ target: ref, function: DESCRIBE_CONTROL_FN },
+				{
+					element: "control for safety preflight",
+					target: ref,
+					function: DESCRIBE_CONTROL_FN,
+				},
 				signal,
 			);
 			if (signal.aborted || epoch !== this.operationEpoch) return this.fail("operation_cancelled");
 			if (result.isError) {
 				return this.fail("unknown_ref", mcpToolText(result));
 			}
-			const text = mcpToolText(result).trim();
+			const text = parseMcpEvaluateJson(mcpToolText(result)).trim();
 			try {
 				const parsed = JSON.parse(text) as ControlDescriptor;
 				return { ok: true, data: parsed };

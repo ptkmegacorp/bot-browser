@@ -17,13 +17,18 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 			const lines = snap.nodes.map(
 				(n) => `${n.ref} ${n.role} "${n.name}"${n.value ? ` value=${n.value}` : ""}`,
 			);
+			const transcript = snap.readableText?.trim();
+			const text = [
+				`url: ${snap.url}`,
+				`title: ${snap.title}`,
+				`generation: ${snap.generation}`,
+				transcript ? `page_text:\n${transcript}` : "",
+				`interactive:\n${lines.join("\n")}`,
+			]
+				.filter(Boolean)
+				.join("\n");
 			return {
-				content: [
-					{
-						type: "text",
-						text: `url: ${snap.url}\ntitle: ${snap.title}\ngeneration: ${snap.generation}\n${lines.join("\n")}`,
-					},
-				],
+				content: [{ type: "text", text }],
 				details: { generation: snap.generation },
 			};
 		},

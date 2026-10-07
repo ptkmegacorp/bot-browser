@@ -333,12 +333,14 @@ export class BrowserController {
 		url: string;
 		title: string;
 		generation: number;
+		bodyText?: string;
 		refs: Array<{ ref: string; role: string; name: string; value?: string; editable?: boolean }>;
 	}): PageSnapshot {
 		return {
 			url: obs.url,
 			title: obs.title,
 			generation: obs.generation,
+			readableText: obs.bodyText,
 			nodes: obs.refs.map((n) => ({
 				ref: n.ref,
 				role: n.role,
@@ -347,6 +349,12 @@ export class BrowserController {
 				editable: n.editable,
 			})),
 		};
+	}
+
+	private async revalidateBoundOriginAfterAction(): Promise<void> {
+		const state = await this.engine.getBindingState();
+		if (!state.live || !state.url) throw new Error("tab_not_attached");
+		await this.assertOriginForUrl(state.url);
 	}
 
 	async snapshot(): Promise<PageSnapshot> {
@@ -388,7 +396,9 @@ export class BrowserController {
 				const before = state.url ?? "";
 				const outcome = await this.engine.navigate(url);
 				const after = assertEngineOk(outcome).url;
-				const redirect = this.originScope.checkRedirect(before, after);
+				const landed = this.originScope.validateNavigation(after);
+				if (!landed.ok) throw new Error(landed.reason);
+				const redirect = this.originScope.checkRedirect(before || url, after);
 				if (!redirect.ok) throw new Error(redirect.reason);
 				this.invalidateObservations();
 				return { url: after };
@@ -408,6 +418,7 @@ export class BrowserController {
 					return { ok: false, blocked: "risky_click_requires_human" };
 				}
 				assertEngineOk(await this.engine.click(ref, ctx));
+				await this.revalidateBoundOriginAfterAction();
 				this.invalidateObservations();
 				return { ok: true };
 			});

@@ -1,5 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { activateCdpTarget, listCdpPages } from "../../chrome/cdp.js";
+import { readMainBodyTextForCdpTarget } from "./cdp-target-page.js";
 import { mcpCallTool, mcpToolText } from "./mcp-client.js";
 
 export type TabIndexResolution =
@@ -37,9 +38,20 @@ function urlsEquivalent(a: string, b: string): boolean {
 	}
 }
 
+function verifyNeedleFromBody(expectedBody: string): string {
+	if (expectedBody.length <= 80 && !expectedBody.includes("\n")) return expectedBody;
+	return (
+		expectedBody
+			.split("\n")
+			.map((s) => s.trim())
+			.find((s) => s.length >= 4) ?? expectedBody.slice(0, 80)
+	);
+}
+
 /**
  * Select the MCP tab that corresponds to an exact CDP target id.
- * Aligns same-URL tabs by relative order in CDP /json/list vs MCP browser_tabs list.
+ * When multiple tabs share a URL, each candidate index is tried and verified
+ * against the CDP target's live body text (not list order alone).
  */
 export async function focusAndSelectCdpTarget(
 	cdpUrl: string,
@@ -52,37 +64,46 @@ export async function focusAndSelectCdpTarget(
 		return { ok: false, code: "target_unavailable", message: "CDP target not in /json/list" };
 	}
 
+	const expectedBody = (await readMainBodyTextForCdpTarget(cdpUrl, targetId))?.trim() ?? "";
+	if (!expectedBody) {
+		return { ok: false, code: "target_unavailable", message: "CDP target page not readable" };
+	}
+	const verifyNeedle = verifyNeedleFromBody(expectedBody);
+
 	const listText = mcpToolText(await mcpCallTool(client, "browser_tabs", { action: "list" }));
 	const mcpTabs = parseMcpTabList(listText);
-	const cdpSameUrl = cdpPages.filter((p) => urlsEquivalent(p.url, target.url));
-	const mcpSameUrl = mcpTabs.filter((t) => urlsEquivalent(t.url, target.url));
-
-	if (mcpSameUrl.length === 0) {
+	const candidates = mcpTabs.filter((t) => urlsEquivalent(t.url, target.url));
+	if (candidates.length === 0) {
 		return { ok: false, code: "target_unavailable", message: "target URL absent from MCP tab list" };
 	}
 
-	const posInCdp = cdpSameUrl.findIndex((p) => p.id === targetId);
-	if (posInCdp < 0) {
-		return { ok: false, code: "target_unavailable" };
+	let matchedIndex: number | null = null;
+	for (const entry of candidates) {
+		await activateCdpTarget(cdpUrl, targetId);
+		const result = await mcpCallTool(client, "browser_tabs", { action: "select", index: entry.index });
+		if (result.isError) continue;
+		const snap = mcpToolText(await mcpCallTool(client, "browser_snapshot", {}));
+		if (!snap.includes(verifyNeedle)) continue;
+		if (matchedIndex !== null) {
+			return {
+				ok: false,
+				code: "ambiguous_tab_match",
+				message: "multiple MCP tabs matched the same CDP target body",
+			};
+		}
+		matchedIndex = entry.index;
 	}
 
-	if (mcpSameUrl.length !== cdpSameUrl.length) {
+	if (matchedIndex === null) {
 		return {
 			ok: false,
 			code: "ambiguous_tab_match",
-			message: "CDP/MCP same-URL tab count mismatch",
+			message: "no MCP tab snapshot matched CDP target body",
 		};
 	}
 
-	const tabIndex = mcpSameUrl[posInCdp]!.index;
 	await activateCdpTarget(cdpUrl, targetId);
-	const result = await mcpCallTool(client, "browser_tabs", { action: "select", index: tabIndex });
-	if (result.isError) {
-		return {
-			ok: false,
-			code: "target_unavailable",
-			message: mcpToolText(result) || "browser_tabs select failed",
-		};
-	}
+	await mcpCallTool(client, "browser_tabs", { action: "select", index: matchedIndex });
+	await activateCdpTarget(cdpUrl, targetId);
 	return { ok: true };
 }
