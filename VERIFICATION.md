@@ -12,11 +12,11 @@ npm run build
 Playwright MCP integration (optional; dedicated headless Chrome, does not touch Agent profile):
 
 ```bash
-npm run test:mcp-spike    # USBA_MCP_SPIKE=1
-npm run test:mcp-engine   # USBA_MCP_ENGINE=1
+npm run test:mcp-spike    # BOT_BROWSER_MCP_SPIKE=1
+npm run test:mcp-engine   # BOT_BROWSER_MCP_ENGINE=1
 ```
 
-Production browser mechanics use `@playwright/mcp@0.0.83` via in-process MCP (`PlaywrightMcpEngine`). Override with `USBA_BROWSER_ENGINE=fake` only when injecting a test engine through `createBrowserEngine`.
+Production browser mechanics use `@playwright/mcp@0.0.83` via in-process MCP (`PlaywrightMcpEngine`). Override with `BOT_BROWSER_BROWSER_ENGINE=fake` only when injecting a test engine through `createBrowserEngine`.
 
 Optional Saturn walkthrough (live backend on `:9477`, Agent Chrome CDP `:9333`, synthetic fixtures):
 
@@ -28,10 +28,10 @@ Optional gates (require Pi auth, models, and/or a running Agent Chrome profile):
 
 | Command | What it exercises |
 |---------|-------------------|
-| `USBA_E2E_LIVE=1 npm run test:e2e-live` | Pi model catalog / provider config |
+| `BOT_BROWSER_E2E_LIVE=1 npm run test:e2e-live` | Pi model catalog / provider config |
 | `npm run test:acceptance` | Real Pi + Saturn Qwen HTTP chat, text-tool shim, handoff HTTP |
-| `npm run test:acceptance:codex` | Real Codex inference smoke (`USBA_E2E_CODEX=1`) |
-| `npm run test:acceptance:panel` | Live side panel + CDP + synthetic form fixture (`USBA_E2E_PANEL=1`) |
+| `npm run test:acceptance:codex` | Real Codex inference smoke (`BOT_BROWSER_E2E_CODEX=1`) |
+| `npm run test:acceptance:panel` | Live side panel + CDP + synthetic form fixture (`BOT_BROWSER_E2E_PANEL=1`) |
 
 **Boundaries:** HTTP/API tests alone do not prove model tool calling or DOM effects. Panel and Pi acceptance tests use **synthetic fixtures** under `/fixtures/` — not third-party production sites.
 
@@ -46,8 +46,8 @@ Optional gates (require Pi auth, models, and/or a running Agent Chrome profile):
 
 ## Operational notes
 
-- Backend listens on loopback only; pairing token is also written to `~/.local/share/ubuntu-shared-browser-agent/state/backend.log` (mode `0600`).
-- Do not commit `.env`, `auth.json`, pairing tokens, or profile data under `~/.local/share/ubuntu-shared-browser-agent/`.
+- Backend listens on loopback only; pairing token is also written to `~/.local/share/bot-browser/state/backend.log` (mode `0600`).
+- Do not commit `.env`, `auth.json`, pairing tokens, or profile data under `~/.local/share/bot-browser/`.
 - Restart backend after updates; watch for `apiVersion` mismatch warnings in the panel.
 
 ## Regression themes covered in unit/integration tests

@@ -48,7 +48,7 @@ function renderMarkdownSafe(text) {
 function headers() {
 	return {
 		"Content-Type": "application/json",
-		"X-USBA-Token": $("token").value.trim(),
+		"X-Bot-Browser-Token": $("token").value.trim(),
 	};
 }
 

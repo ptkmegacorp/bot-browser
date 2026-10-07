@@ -1,4 +1,4 @@
-# Ubuntu Shared Browser Agent — V1 handoff
+# Bot Browser — V1 handoff
 
 ## Product
 One visible system Google Chrome window, one persistent profile displayed as **Agent**, one designated task tab, and chat in the Chrome side panel. User and agent share that tab; other tabs and everyday Chrome profiles are untouched. Final consequential clicks remain human-owned in V1.
@@ -20,7 +20,7 @@ Add a clearly labelled **Allow all sites** toggle under Settings → Site permis
 Use a friendly **🤖 robot-inspired icon** as the shared app identity: simple robot face on a rounded dark tile, with a restrained blue accent matching the chat UI. Keep it legible at 16px; no text or tiny details. Prefer a bundled vector drawing over rendering an emoji glyph at runtime (appearance/fonts vary across Ubuntu and Chrome).
 
 - Keep one source SVG in `assets/`; export bundled PNGs at 16, 32, 48, 128, and 256px. No remote icon service, runtime font dependency, or unnecessary image library.
-- **GNOME:** install app icon under the user's hicolor icon theme and a `.desktop` launcher named **Ubuntu Shared Browser Agent**. Icon name `ubuntu-shared-browser-agent`; set appropriate launcher/window identity (`StartupWMClass=UbuntuSharedBrowserAgent` for X11). Verify actual GNOME dock/app-grid association on this device's Wayland session too; WM_CLASS alone may not establish Wayland identity. Launcher must start/reuse the backend and Agent Chrome, not spawn duplicate profiles.
+- **GNOME:** install app icon under the user's hicolor icon theme and a `.desktop` launcher named **Bot Browser**. Icon name `bot-browser`; set appropriate launcher/window identity (`StartupWMClass=BotBrowser` for X11). Verify actual GNOME dock/app-grid association on this device's Wayland session too; WM_CLASS alone may not establish Wayland identity. Launcher must start/reuse the backend and Agent Chrome, not spawn duplicate profiles.
 - **Chrome extension:** populate manifest `icons` and `action.default_icon` with matching PNGs; add local favicon links to side-panel HTML and other app-owned extension pages.
 - **App-owned tabs:** serve matching favicon assets for welcome/demo pages and any local app UI; include appropriate favicon links. Third-party website tabs keep their own site favicons—we do not override external site branding.
 - Copy/installation is user-local, with no root requirement. Document icon/desktop installation and extension reload. Ship icons with the repo; check asset provenance/license if adapting external artwork.
@@ -109,7 +109,7 @@ Routine configuration belongs in settings. A blocked task must still show an inl
 - TypeScript/Node backend using the installed Pi SDK's model runtime and agent session.
 - **Browser engine (production):** `PlaywrightMcpEngine` — pinned `@playwright/mcp@0.0.83`, in-process MCP (`createConnection` + linked in-memory transport). CDP attach to Agent Chrome on loopback; exact-tab binding uses CDP target IDs (see `tab-resolve.ts` / adapter index mapping), not URL/title alone.
 - **Browser engine boundary:** `BrowserEngine` in `src/browser/engine.ts`; `BrowserController` owns authority, queueing, origin policy, safety preflight, and observation/ref provenance. Pi tools never call MCP directly.
-- **Tests:** `USBA_BROWSER_ENGINE=fake` selects `FakeBrowserEngine` in `createBrowserEngine`. Unit/integration tests that need a real DOM use `BrowserController.forTestingAttachPage` → `PlaywrightPageEngine` (legacy interactive collector in `element-registry.ts` / `snapshot.ts` — not used in production).
+- **Tests:** `BOT_BROWSER_BROWSER_ENGINE=fake` selects `FakeBrowserEngine` in `createBrowserEngine`. Unit/integration tests that need a real DOM use `BrowserController.forTestingAttachPage` → `PlaywrightPageEngine` (legacy interactive collector in `element-registry.ts` / `snapshot.ts` — not used in production).
 - Optional engine regression: `npm run test:mcp-spike`, `npm run test:mcp-engine`; optional Saturn fixture walkthrough: `npm run test:saturn-e2e-verify` (requires running backend + Agent Chrome).
 - Manifest V3 extension: side-panel chat, attach/detach, pause/resume, attached-tab URL, model picker, progress/errors.
 - Reuse Pi model configuration/auth, including OAuth refresh, via `ModelRuntime`, not hand-written token extraction. OpenAI subscription auth is NOT a generic OpenAI API key; use Pi's `openai-codex` provider adapter.
@@ -119,8 +119,8 @@ Routine configuration belongs in settings. A blocked task must still show an inl
 - Backend serves authenticated local extension transport. Bind only to loopback; validate extension origin, pairing token, messages, and payload sizes. No unauthenticated control route or wildcard origins.
 
 ## Startup
-1. Start backend and launch ordinary system Chrome with sandbox enabled and non-default user-data directory `~/.local/share/ubuntu-shared-browser-agent/chrome/` (directory mode 0700).
-2. Set profile display name to Agent. Never reuse/copy the everyday Chrome profile or delete profile data on restart. Package name: `ubuntu-shared-browser-agent`.
+1. Start backend and launch ordinary system Chrome with sandbox enabled and non-default user-data directory `~/.local/share/bot-browser/chrome/` (directory mode 0700).
+2. Set profile display name to Agent. Never reuse/copy the everyday Chrome profile or delete profile data on restart. Package name: `bot-browser`.
 3. Create/open a dedicated task tab at a local welcome/demo page; explicitly bind its stable Chrome tab identity to its CDP target. Agent never guesses first/active tab.
 4. On repeat startup, reuse the designated tab if valid, otherwise create one; avoid duplicate windows/tabs and competing profile processes.
 5. Side panel is opened by user click if Chrome requires a user gesture. First-run extension installation is manual (unpacked extension in Agent profile); document it.

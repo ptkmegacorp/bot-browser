@@ -38,7 +38,7 @@ export async function startPiE2eServer(params: {
 export function apiHeaders(token: string) {
 	return {
 		"Content-Type": "application/json",
-		"X-USBA-Token": token,
+		"X-Bot-Browser-Token": token,
 		Origin: "chrome-extension://e2e",
 	};
 }

@@ -23,12 +23,12 @@ Other untracked paths may appear from parallel work (`src/browser/engine.ts`, et
 | --- | --- |
 | `npm test` | **PASS** — 19 files / 46 tests passed; 6 files / 14 tests skipped (includes spike + e2e gates) |
 | `npm run build` | **PASS** (`tsc`) |
-| `USBA_MCP_SPIKE=1 npx vitest run tests/playwright-mcp-spike.test.ts` | **PASS** — 9/9 |
+| `BOT_BROWSER_MCP_SPIKE=1 npx vitest run tests/playwright-mcp-spike.test.ts` | **PASS** — 9/9 |
 | `npm run test:acceptance*` | **Not run** (needs Pi credentials / live panel infra) |
 
 Agent Chrome CDP at `http://127.0.0.1:9333` was **reachable** (`/json/version` → 200) during this session. Destructive spike cases use **dedicated headless Chrome** launched inside tests so the live Agent profile is not mutated.
 
-Opt-in gate: set `USBA_MCP_SPIKE=1` to run spike tests (default `npm test` skips them).
+Opt-in gate: set `BOT_BROWSER_MCP_SPIKE=1` to run spike tests (default `npm test` skips them).
 
 ## Pinned upstream package
 
@@ -86,10 +86,10 @@ These are **integration gates** before production migration:
 1. **No CDP target ID in MCP API** — Tab operations are **index-based** (`browser_tabs` `select`/`close`). URL/title collision must be resolved **outside** MCP (existing `tab-resolve.ts` + CDP target id), then mapped to a stable index before each tool call with revalidation.
 2. **Upstream tab-close semantics** — On close, Playwright MCP context `_onPageClosed` **auto-selects a neighboring tab**; `ensureTab()` can **open a new blank tab** when none remain. Product requires **unavailable / detached** state, not silent tab switching or implicit new tabs.
 3. **`contextGetter` isolation** — Supplying a single-tab `BrowserContext` is the documented seam, but CDP attach still exposes the full browser unless the adapter filters pages and refuses cross-target tools. Needs a designed adapter boundary (no partial fake contexts).
-4. **Safety and human-owned actions** — MCP tools (`browser_click`, `browser_type`, etc.) do not run USBA origin policy, sensitive masking, or consequential-control handoff. All mutating paths must stay in `BrowserController` with preflight on **current** ref metadata.
+4. **Safety and human-owned actions** — MCP tools (`browser_click`, `browser_type`, etc.) do not run Bot Browser origin policy, sensitive masking, or consequential-control handoff. All mutating paths must stay in `BrowserController` with preflight on **current** ref metadata.
 5. **Version skew** — MCP bundles alpha `playwright-core`; app uses stable `playwright` ^1.63. Pin/align during Phase 1 adapter work.
 
-**Spike status:** **Complete for Phase 0 mechanics** (snapshots, fill, screenshot, cancellation, disconnect). **Production migration (Phases 1–3):** `PlaywrightMcpEngine` is the default production adapter; `BrowserController` wraps all mutating paths with policy preflight. Residual product limits (index-based MCP tab ops, neighbor-tab behavior on upstream close, version skew vs app `playwright`) are documented in `BROWSER_ENGINE_REFACTOR_PLAN.md` and covered by `USBA_MCP_ENGINE=1` adapter tests where applicable.
+**Spike status:** **Complete for Phase 0 mechanics** (snapshots, fill, screenshot, cancellation, disconnect). **Production migration (Phases 1–3):** `PlaywrightMcpEngine` is the default production adapter; `BrowserController` wraps all mutating paths with policy preflight. Residual product limits (index-based MCP tab ops, neighbor-tab behavior on upstream close, version skew vs app `playwright`) are documented in `BROWSER_ENGINE_REFACTOR_PLAN.md` and covered by `BOT_BROWSER_MCP_ENGINE=1` adapter tests where applicable.
 
 ## Recommended engine interface (Phase 1 input)
 
@@ -105,7 +105,7 @@ Keep upstream types inside `src/browser/engines/playwright-mcp.ts`:
 
 - `SPIKE_REPORT.md` (this file)
 - `tests/helpers/mcp-spike-harness.ts` — CDP helpers, dedicated browser launcher, in-process MCP client
-- `tests/playwright-mcp-spike.test.ts` — env-gated spike tests (`USBA_MCP_SPIKE=1`)
+- `tests/playwright-mcp-spike.test.ts` — env-gated spike tests (`BOT_BROWSER_MCP_SPIKE=1`)
 - `package.json` / `package-lock.json` — pin `@playwright/mcp@0.0.83`, dev `@modelcontextprotocol/sdk@1.25.2`
 
 ## Re-run spike
@@ -113,5 +113,5 @@ Keep upstream types inside `src/browser/engines/playwright-mcp.ts`:
 ```bash
 npm test
 npm run build
-USBA_MCP_SPIKE=1 npx vitest run tests/playwright-mcp-spike.test.ts
+BOT_BROWSER_MCP_SPIKE=1 npx vitest run tests/playwright-mcp-spike.test.ts
 ```

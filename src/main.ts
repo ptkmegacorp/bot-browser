@@ -1,4 +1,11 @@
-import { assertLoopbackHost, DEFAULT_HTTP_HOST, DEFAULT_HTTP_PORT, extensionIdFromEnv } from "./config.js";
+import {
+	assertLoopbackHost,
+	cdpUrl,
+	DEFAULT_HTTP_HOST,
+	DEFAULT_HTTP_PORT,
+	extensionIdFromEnv,
+} from "./config.js";
+import { navigateCdpTarget } from "./browser/engines/cdp-target-page.js";
 import { originFromUrl } from "./browser/origin-scope.js";
 import { ensureAgentChrome } from "./chrome/launcher.js";
 import { TabBindingStore } from "./browser/binding.js";
@@ -8,8 +15,8 @@ import { createAgentHost } from "./agent/session.js";
 import { createAppServer } from "./server/http.js";
 import { acquireInstanceLock } from "./server/instance-lock.js";
 
-const port = Number(process.env.USBA_PORT ?? DEFAULT_HTTP_PORT);
-const host = process.env.USBA_HOST ?? DEFAULT_HTTP_HOST;
+const port = Number(process.env.BOT_BROWSER_PORT ?? DEFAULT_HTTP_PORT);
+const host = process.env.BOT_BROWSER_HOST ?? DEFAULT_HTTP_HOST;
 assertLoopbackHost(host);
 
 async function boot(): Promise<void> {
@@ -24,9 +31,6 @@ async function boot(): Promise<void> {
 	const engine = createBrowserEngine(launch.state.cdpPort);
 	const controller = new BrowserController(bindings, launch.state.cdpPort, engine);
 	bindings.syncFromChromeState(launch.state, 0);
-	await controller.connect(launch.state.taskTargetId);
-	const taskOrigin = originFromUrl(launch.state.taskUrl);
-	if (taskOrigin) controller.originScope.approve(taskOrigin);
 
 	const agentHost = await createAgentHost(controller);
 
@@ -37,18 +41,27 @@ async function boot(): Promise<void> {
 		chromeState: launch.state,
 		controller,
 		agentHost,
-		onPause: () => console.log("[usba] paused"),
-		onResume: () => console.log("[usba] resumed"),
-		onHumanHandoff: (active) => console.log(`[usba] human handoff ${active ? "on" : "off"}`),
+		onPause: () => console.log("[bot-browser] paused"),
+		onResume: () => console.log("[bot-browser] resumed"),
+		onHumanHandoff: (active) => console.log(`[bot-browser] human handoff ${active ? "on" : "off"}`),
 	});
 
-	server.listen(port, host, () => {
-		console.log(`ubuntu-shared-browser-agent listening on http://${host}:${port}`);
-		console.log(`Pairing token (set in extension): ${launch.state!.pairingToken}`);
-		const extId = extensionIdFromEnv();
-		if (extId) console.log(`Paired extension id: ${extId}`);
-		console.log(`Task tab: ${launch.state!.taskUrl}`);
+	await new Promise<void>((resolve, reject) => {
+		server.once("error", reject);
+		server.listen(port, host, () => resolve());
 	});
+
+	const taskCdp = cdpUrl(launch.state.cdpPort);
+	await navigateCdpTarget(taskCdp, launch.state.taskTargetId, launch.state.taskUrl);
+	await controller.connect(launch.state.taskTargetId);
+	const taskOrigin = originFromUrl(launch.state.taskUrl);
+	if (taskOrigin) controller.originScope.approve(taskOrigin);
+
+	console.log(`bot-browser listening on http://${host}:${port}`);
+	console.log(`Pairing token (set in extension): ${launch.state.pairingToken}`);
+	const extId = extensionIdFromEnv();
+	if (extId) console.log(`Paired extension id: ${extId}`);
+	console.log(`Task tab: ${launch.state.taskUrl}`);
 
 	const shutdown = async () => {
 		lock.release();

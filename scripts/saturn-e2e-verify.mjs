@@ -1,14 +1,17 @@
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
-const OUT = "/tmp/usba-e2e-verify";
+const REPO_ROOT = process.env.BOT_BROWSER_REPO ?? join(dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_EXT = join(REPO_ROOT, "extension");
+const OUT = "/tmp/bot-browser-e2e-verify";
 mkdirSync(OUT, { recursive: true });
 const BASE = "http://127.0.0.1:9477";
 const MODEL = "saturn::qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local";
-const REPO_EXT = "/home/bot/projects/ubuntu-shared-browser-agent/extension";
 
 const state = JSON.parse(
-	readFileSync(`${process.env.HOME}/.local/share/ubuntu-shared-browser-agent/state/chrome-runtime.json`, "utf8"),
+	readFileSync(`${process.env.HOME}/.local/share/bot-browser/state/chrome-runtime.json`, "utf8"),
 );
 const token = state.pairingToken;
 
@@ -17,7 +20,7 @@ const session = await browser.newBrowserCDPSession();
 const { extensions } = await session.send("Extensions.getExtensions", {});
 await session.detach();
 const ext = extensions?.find(
-	(e) => e.path === REPO_EXT || e.name === "Ubuntu Shared Browser Agent",
+	(e) => e.path === REPO_EXT || e.name === "Bot Browser",
 );
 if (!ext?.id) throw new Error("extension not loaded");
 const EXT_ID = ext.id;
@@ -25,7 +28,7 @@ writeFileSync(`${OUT}/extension-id.txt`, EXT_ID + "\n");
 
 const apiHeaders = {
 	"Content-Type": "application/json",
-	"X-USBA-Token": token,
+	"X-Bot-Browser-Token": token,
 	Origin: `chrome-extension://${EXT_ID}`,
 };
 

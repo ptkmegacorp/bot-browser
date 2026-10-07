@@ -13,7 +13,7 @@ import { createBrowserTools } from "./tools.js";
 
 type AgentModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
 
-const SYSTEM_PROMPT = `You are a browser assistant for Ubuntu Shared Browser Agent.
+const SYSTEM_PROMPT = `You are a browser assistant for Bot Browser.
 You control only the designated task tab via browser tools.
 Use page_snapshot before interactions. Never attempt password entry.
 The human user performs final submit/send/purchase/delete/agreement clicks.

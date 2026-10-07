@@ -13,16 +13,16 @@ import {
 	type DedicatedCdpSession,
 } from "./helpers/mcp-spike-harness.js";
 
-const enabled = process.env.USBA_MCP_ENGINE === "1";
+const enabled = process.env.BOT_BROWSER_MCP_ENGINE === "1";
 const ORIGIN = "http://127.0.0.1";
 
-describe.skipIf(!enabled)("Playwright MCP review fixes (USBA_MCP_ENGINE=1)", () => {
+describe.skipIf(!enabled)("Playwright MCP review fixes (BOT_BROWSER_MCP_ENGINE=1)", () => {
 	let session: DedicatedCdpSession;
 	let outputDir: string;
 
 	beforeEach(async () => {
 		session = await launchDedicatedCdpBrowser();
-		outputDir = await mkdtemp(join(tmpdir(), "usba-mcp-review-out-"));
+		outputDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-review-out-"));
 	});
 
 	afterEach(async () => {

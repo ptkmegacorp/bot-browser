@@ -13,7 +13,7 @@ export async function ensureBundledExtensionLoaded(port = DEFAULT_CDP_PORT): Pro
 	try {
 		const listed = await session.send("Extensions.getExtensions", {});
 		const already = listed.extensions?.find(
-			(e) => e.path === extDir || e.name === "Ubuntu Shared Browser Agent",
+			(e) => e.path === extDir || e.name === "Bot Browser",
 		);
 		if (already?.enabled) return already.id;
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-PORT="${USBA_PORT:-9477}"
+PORT="${BOT_BROWSER_PORT:-9477}"
 
 # Rofi / .desktop launches skip login-shell PATH (no nvm). Find npm before starting backend.
 setup_node_path() {
@@ -25,16 +25,16 @@ setup_node_path() {
 		export PATH="$npm_bin:$PATH"
 	fi
 	if ! command -v npm >/dev/null 2>&1; then
-		echo "ubuntu-shared-browser-agent: npm not found (install Node 20+ or nvm)." >&2
+		echo "bot-browser: npm not found (install Node 20+ or nvm)." >&2
 		if command -v notify-send >/dev/null 2>&1; then
-			notify-send "Ubuntu Shared Browser Agent" "npm not found. Install Node 20+ or set PATH."
+			notify-send "Bot Browser" "npm not found. Install Node 20+ or set PATH."
 		fi
 		exit 127
 	fi
 }
-HOST="${USBA_HOST:-127.0.0.1}"
-PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-shared-browser-agent/chrome"
-EXT_DIR="${USBA_EXTENSION_PATH:-$REPO_ROOT/extension}"
+HOST="${BOT_BROWSER_HOST:-127.0.0.1}"
+PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/chrome"
+EXT_DIR="${BOT_BROWSER_EXTENSION_PATH:-$REPO_ROOT/extension}"
 WELCOME="http://${HOST}:${PORT}/fixtures/welcome.html"
 
 chrome_extension_args() {
@@ -57,7 +57,7 @@ launch_detached_chrome() {
 	local -a cmd=(
 		/usr/bin/google-chrome
 		--user-data-dir="$PROFILE"
-		--class=UbuntuSharedBrowserAgent
+		--class=BotBrowser
 		--no-first-run
 		--no-default-browser-check
 	)
@@ -88,7 +88,7 @@ open_agent_chrome() {
 if chrome_running; then
 	open_agent_chrome
 	if command -v notify-send >/dev/null 2>&1; then
-		notify-send "Ubuntu Shared Browser Agent" "Agent Chrome is open."
+		notify-send "Bot Browser" "Agent Chrome is open."
 	fi
 	exit 0
 fi
@@ -96,13 +96,13 @@ fi
 if backend_healthy; then
 	launch_detached_chrome 1
 	if command -v notify-send >/dev/null 2>&1; then
-		notify-send "Ubuntu Shared Browser Agent" "Reopened Agent Chrome."
+		notify-send "Bot Browser" "Reopened Agent Chrome."
 	fi
 	exit 0
 fi
 
 if command -v notify-send >/dev/null 2>&1; then
-	notify-send "Ubuntu Shared Browser Agent" "Starting backend and Agent Chrome…"
+	notify-send "Bot Browser" "Starting backend and Agent Chrome…"
 fi
 
 run_backend() {
@@ -114,7 +114,7 @@ run_backend() {
 BACKEND_CMD="export NVM_DIR=\"\${NVM_DIR:-\$HOME/.nvm}\"; [[ -s \"\$NVM_DIR/nvm.sh\" ]] && . \"\$NVM_DIR/nvm.sh\"; nvm use default >/dev/null 2>&1 || true; cd '$REPO_ROOT' && npm run start"
 
 if command -v gnome-terminal >/dev/null 2>&1; then
-	exec gnome-terminal --title="Ubuntu Shared Browser Agent" -- bash -lc "$BACKEND_CMD; echo; read -r -p 'Press Enter to close…' _"
+	exec gnome-terminal --title="Bot Browser" -- bash -lc "$BACKEND_CMD; echo; read -r -p 'Press Enter to close…' _"
 fi
 if command -v x-terminal-emulator >/dev/null 2>&1; then
 	exec x-terminal-emulator -e bash -lc "$BACKEND_CMD; exec bash"

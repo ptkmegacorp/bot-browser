@@ -5,7 +5,7 @@ import { BrowserController } from "../src/browser/controller.js";
 import { apiHeaders, startPiE2eServer } from "./helpers/pi-e2e-server.js";
 import { loadSyntheticHtml, TEST_ORIGIN } from "./helpers/test-page.js";
 
-const enabled = process.env.USBA_E2E_PI === "1";
+const enabled = process.env.BOT_BROWSER_E2E_PI === "1";
 const port = 19670;
 const token = "handoff-pi-token";
 

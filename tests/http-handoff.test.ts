@@ -54,7 +54,7 @@ describe("http handoff race", () => {
 
 		const headers = {
 			"Content-Type": "application/json",
-			"X-USBA-Token": token,
+			"X-Bot-Browser-Token": token,
 			Origin: "chrome-extension://abc",
 		};
 

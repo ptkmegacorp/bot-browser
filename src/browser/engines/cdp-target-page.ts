@@ -43,3 +43,12 @@ export async function readMainBodyTextForCdpTarget(cdpUrl: string, targetId: str
 		}
 	});
 }
+
+/** Load the task tab after the local HTTP server is listening (welcome fixture). */
+export async function navigateCdpTarget(cdpUrl: string, targetId: string, url: string): Promise<void> {
+	const ok = await withPageForCdpTarget(cdpUrl, targetId, async (page) => {
+		await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20_000 });
+		return true;
+	});
+	if (!ok) throw new Error("unknown_tab");
+}

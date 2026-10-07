@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MODEL } from "../src/config.js";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
-const live = process.env.USBA_E2E_LIVE === "1";
+const live = process.env.BOT_BROWSER_E2E_LIVE === "1";
 
 describe.skipIf(!live)("live provider smoke", () => {
 	it("default model is available for tool calling", async () => {

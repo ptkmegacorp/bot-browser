@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const APP_NAME = "ubuntu-shared-browser-agent";
-export const WM_CLASS = "UbuntuSharedBrowserAgent";
+export const APP_NAME = "bot-browser";
+export const WM_CLASS = "BotBrowser";
 /** Bump when /api/status schema or binding semantics change. */
 export const API_VERSION = 3;
 
@@ -19,12 +19,12 @@ const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 export function assertLoopbackHost(host: string): void {
 	if (!LOOPBACK_HOSTS.has(host)) {
-		throw new Error(`USBA_HOST must be loopback, got ${host}`);
+		throw new Error(`BOT_BROWSER_HOST must be loopback, got ${host}`);
 	}
 }
 
 export function extensionIdFromEnv(): string | undefined {
-	const id = process.env.USBA_EXTENSION_ID?.trim();
+	const id = process.env.BOT_BROWSER_EXTENSION_ID?.trim();
 	return id || undefined;
 }
 
@@ -41,12 +41,12 @@ export function stateDir(): string {
 }
 
 export function chromeExecutable(): string {
-	return process.env.USBA_CHROME_EXECUTABLE ?? "/usr/bin/google-chrome";
+	return process.env.BOT_BROWSER_CHROME_EXECUTABLE ?? "/usr/bin/google-chrome";
 }
 
-/** Unpacked MV3 extension shipped with this repo (override with USBA_EXTENSION_PATH). */
+/** Unpacked MV3 extension shipped with this repo (override with BOT_BROWSER_EXTENSION_PATH). */
 export function bundledExtensionDir(): string {
-	const fromEnv = process.env.USBA_EXTENSION_PATH?.trim();
+	const fromEnv = process.env.BOT_BROWSER_EXTENSION_PATH?.trim();
 	if (fromEnv) return fromEnv;
 	return join(dirname(fileURLToPath(import.meta.url)), "..", "extension");
 }

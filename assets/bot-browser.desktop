@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Bot Browser
+GenericName=Browser Agent
+Comment=Start the Agent Chrome profile and automation backend
+Keywords=bot;browser;chrome;automation;bot-browser;botbrowser;BotBrowser;
+Exec=@REPO_ROOT@/scripts/launch-bot-browser.sh
+Icon=bot-browser
+Terminal=false
+Categories=Network;Development;
+StartupNotify=true
+StartupWMClass=BotBrowser

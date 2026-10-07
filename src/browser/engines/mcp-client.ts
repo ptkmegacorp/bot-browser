@@ -11,14 +11,14 @@ export interface McpClientSession {
 	close: () => Promise<void>;
 }
 
-/** Minimal @playwright/mcp config surface used by USBA (full type is not package-exported). */
+/** Minimal @playwright/mcp config surface used by Bot Browser (full type is not package-exported). */
 export type PlaywrightMcpConfig = Parameters<typeof createConnection>[0];
 
 export async function createInProcessMcpSession(config: PlaywrightMcpConfig): Promise<McpClientSession> {
 	const server = await createConnection(config);
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 	await server.connect(serverTransport);
-	const client = new Client({ name: "usba-playwright-mcp", version: "1.0.0" });
+	const client = new Client({ name: "bot-browser-playwright-mcp", version: "1.0.0" });
 	await client.connect(clientTransport);
 	return {
 		client,

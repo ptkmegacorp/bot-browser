@@ -53,7 +53,7 @@ async function postControl(body) {
 	try {
 		const res = await fetch(`${baseUrl.replace(/\/$/, "")}/api/control`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify(body),
 		});
 		return res.ok ? await res.json() : null;

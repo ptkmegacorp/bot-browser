@@ -2,10 +2,10 @@
 # Headed smoke test on Sway: backend + Agent Chrome window + screenshot proof.
 set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${USBA_E2E_SCREENSHOT:-/tmp/usba-agent-chrome.png}"
-PORT="${USBA_PORT:-9477}"
-HOST="${USBA_HOST:-127.0.0.1}"
-PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/ubuntu-shared-browser-agent/chrome"
+OUT="${BOT_BROWSER_E2E_SCREENSHOT:-/tmp/bot-browser-agent-chrome.png}"
+PORT="${BOT_BROWSER_PORT:-9477}"
+HOST="${BOT_BROWSER_HOST:-127.0.0.1}"
+PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/chrome"
 
 setup_node_path() {
 	if command -v npm >/dev/null 2>&1; then return 0; fi
@@ -36,7 +36,7 @@ if curl -sf "http://${HOST}:${PORT}/health" >/dev/null 2>&1; then
 	echo "Backend already healthy on :${PORT}"
 else
 	cd "$REPO_ROOT"
-	npm run start > /tmp/usba-e2e-backend.log 2>&1 &
+	npm run start > /tmp/bot-browser-e2e-backend.log 2>&1 &
 	BACKEND_PID=$!
 	for i in $(seq 1 60); do
 		if curl -sf "http://${HOST}:${PORT}/health" >/dev/null 2>&1; then
@@ -47,7 +47,7 @@ else
 	done
 	if ! curl -sf "http://${HOST}:${PORT}/health" >/dev/null 2>&1; then
 		echo "Backend failed to start. Log:" >&2
-		tail -40 /tmp/usba-e2e-backend.log >&2
+		tail -40 /tmp/bot-browser-e2e-backend.log >&2
 		exit 1
 	fi
 fi
@@ -86,7 +86,7 @@ def walk(n):
     props = n.get("window_properties") or {}
     cls = props.get("class") or props.get("instance") or ""
     blob = (name + str(cls)).lower()
-    if "chrom" in blob or ("ubuntu" in blob and "browser" in blob):
+    if "chrom" in blob or "botbrowser" in blob.replace("_", "").replace("-", ""):
         return n.get("id")
     return None
 

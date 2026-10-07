@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 
 // Opt-in: uses the already-open unpacked side panel and real configured Qwen endpoint.
 // Sends only synthetic fixture content. No session-history injection or test controller binding.
-it.skipIf(process.env.USBA_E2E_PANEL !== "1")("real side panel reads and fills only the requested field", async () => {
+it.skipIf(process.env.BOT_BROWSER_E2E_PANEL !== "1")("real side panel reads and fills only the requested field", async () => {
  const browser = await chromium.connectOverCDP('http://127.0.0.1:9333');
  const context = browser.contexts()[0]!;
  const panel = context.pages().find(p => p.url().startsWith('chrome-extension://') && p.url().endsWith('/sidepanel.html'));
@@ -28,7 +28,7 @@ it.skipIf(process.env.USBA_E2E_PANEL !== "1")("real side panel reads and fills o
   originalTarget = await panel.evaluate(async()=>{
    const base=(document.querySelector('#baseUrl') as HTMLInputElement).value;
    const token=(document.querySelector('#token') as HTMLInputElement).value;
-   const s=await (await fetch(base+'/api/status',{headers:{'X-USBA-Token':token}})).json();
+   const s=await (await fetch(base+'/api/status',{headers:{'X-Bot-Browser-Token':token}})).json();
    return s.taskTab?.targetId ?? null;
   });
   testPage = await context.newPage();

@@ -17,7 +17,7 @@ export function parseAuth(
 			}
 		}
 	}
-	const token = req.headers["x-usba-token"];
+	const token = req.headers["x-bot-browser-token"];
 	if (!token || token !== expectedToken) {
 		return { ok: false, reason: "invalid_token" };
 	}

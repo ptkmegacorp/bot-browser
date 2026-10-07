@@ -9,14 +9,14 @@ describe("parseAuth", () => {
 
 	it("accepts valid extension origin and token", () => {
 		const req = {
-			headers: { origin: "chrome-extension://abc", "x-usba-token": "secret" },
+			headers: { origin: "chrome-extension://abc", "x-bot-browser-token": "secret" },
 		} as import("node:http").IncomingMessage;
 		expect(parseAuth(req, "secret")).toEqual({ ok: true });
 	});
 
 	it("enforces paired extension id when configured", () => {
 		const req = {
-			headers: { origin: "chrome-extension://abc", "x-usba-token": "secret" },
+			headers: { origin: "chrome-extension://abc", "x-bot-browser-token": "secret" },
 		} as import("node:http").IncomingMessage;
 		expect(parseAuth(req, "secret", "other")).toEqual({ ok: false, reason: "invalid_extension_id" });
 		expect(parseAuth(req, "secret", "abc")).toEqual({ ok: true });
@@ -24,7 +24,7 @@ describe("parseAuth", () => {
 
 	it("rejects bad origin", () => {
 		const req = {
-			headers: { origin: "https://evil.test", "x-usba-token": "secret" },
+			headers: { origin: "https://evil.test", "x-bot-browser-token": "secret" },
 		} as import("node:http").IncomingMessage;
 		expect(parseAuth(req, "secret")).toEqual({ ok: false, reason: "invalid_origin" });
 	});

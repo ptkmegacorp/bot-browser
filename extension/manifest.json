@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Ubuntu Shared Browser Agent",
+  "name": "Bot Browser",
   "version": "1.1.0",
   "description": "Side-panel chat for the Agent Chrome profile task tab.",
   "permissions": ["sidePanel", "storage", "tabs"],

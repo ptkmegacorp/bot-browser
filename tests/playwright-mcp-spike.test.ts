@@ -20,7 +20,7 @@ launchDedicatedCdpBrowser,
 	toolText,
 } from "./helpers/mcp-spike-harness.js";
 
-const spikeEnabled = process.env.USBA_MCP_SPIKE === "1";
+const spikeEnabled = process.env.BOT_BROWSER_MCP_SPIKE === "1";
 const SPIKE_ORIGIN = "http://127.0.0.1";
 const DUP_PATH = "/spike-dup-url";
 
@@ -51,7 +51,7 @@ async function openSameUrlTab(sessionBrowser: Browser, marker: string) {
 	await page.goto(`${SPIKE_ORIGIN}${DUP_PATH}`);
 }
 
-describe.skipIf(!spikeEnabled)("playwright MCP spike (USBA_MCP_SPIKE=1)", () => {
+describe.skipIf(!spikeEnabled)("playwright MCP spike (BOT_BROWSER_MCP_SPIKE=1)", () => {
 	let session: DedicatedCdpSession;
 	let outputDir: string;
 	let agentCdpUp = false;
@@ -59,7 +59,7 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (USBA_MCP_SPIKE=1)", () => 
 	beforeAll(async () => {
 		agentCdpUp = await agentChromeReachable();
 		session = await launchDedicatedCdpBrowser();
-		outputDir = await mkdtemp(join(tmpdir(), "usba-mcp-out-"));
+		outputDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-out-"));
 	});
 
 	afterAll(async () => {
@@ -171,7 +171,7 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (USBA_MCP_SPIKE=1)", () => 
 	it("after tab close, upstream selects a neighbor tab (not an unavailable terminal state)", async () => {
 		// Isolated browser: shared session accumulates tabs from earlier spike cases.
 		const isolated = await launchDedicatedCdpBrowser();
-		const isolatedOut = await mkdtemp(join(tmpdir(), "usba-mcp-close-"));
+		const isolatedOut = await mkdtemp(join(tmpdir(), "bot-browser-mcp-close-"));
 		const ctx = isolated.browser.contexts()[0]!;
 		const closeOrigin = "http://127.0.0.1";
 		async function openCloseFixture(html: string, slug: string) {
@@ -254,15 +254,15 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (USBA_MCP_SPIKE=1)", () => 
 	});
 });
 
-describe.skipIf(!spikeEnabled)("playwright MCP subprocess smoke (USBA_MCP_SPIKE=1)", () => {
+describe.skipIf(!spikeEnabled)("playwright MCP subprocess smoke (BOT_BROWSER_MCP_SPIKE=1)", () => {
 	it("stdio subprocess can list tools when given isolated browser config", async () => {
-		const outputDir = await mkdtemp(join(tmpdir(), "usba-mcp-stdio-out-"));
+		const outputDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-stdio-out-"));
 		const cli = join(process.cwd(), "node_modules/@playwright/mcp/cli.js");
 		const transport = new StdioClientTransport({
 			command: process.execPath,
 			args: [cli, "--isolated", "--headless", "--output-dir", outputDir],
 		});
-		const client = new Client({ name: "usba-mcp-stdio-spike", version: "1.0.0" });
+		const client = new Client({ name: "bot-browser-mcp-stdio-spike", version: "1.0.0" });
 		try {
 			await client.connect(transport);
 			const tools = await client.listTools();

@@ -5,14 +5,14 @@ const EXT_ID = "ibdinaladaneiiljiihiohdmklbnobim";
 const BASE = "http://127.0.0.1:9477";
 const MODEL = "saturn::qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local";
 const state = JSON.parse(
-	readFileSync(`${process.env.HOME}/.local/share/ubuntu-shared-browser-agent/state/chrome-runtime.json`, "utf8"),
+	readFileSync(`${process.env.HOME}/.local/share/bot-browser/state/chrome-runtime.json`, "utf8"),
 );
 const token = state.pairingToken;
 const taskTargetId = state.taskTargetId;
 
 const apiHeaders = {
 	"Content-Type": "application/json",
-	"X-USBA-Token": token,
+	"X-Bot-Browser-Token": token,
 	Origin: `chrome-extension://${EXT_ID}`,
 };
 

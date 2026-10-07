@@ -63,7 +63,7 @@ describe("origin policy HTTP", () => {
 
 		const chat = await fetch(`http://127.0.0.1:${port}/api/chat`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ message: "hi" }),
 		});
 		expect(chat.status).toBe(409);
@@ -72,14 +72,14 @@ describe("origin policy HTTP", () => {
 
 		const chatOk = await fetch(`http://127.0.0.1:${port}/api/control`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ action: "set_origin_policy", originPolicyMode: "all_public_web" }),
 		});
 		expect(chatOk.status).toBe(200);
 
 		const chatAfter = await fetch(`http://127.0.0.1:${port}/api/chat`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ message: "hi" }),
 		});
 		expect(chatAfter.status).toBe(200);

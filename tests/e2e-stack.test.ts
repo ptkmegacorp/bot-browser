@@ -80,7 +80,7 @@ describe("synthetic full-stack e2e", () => {
 
 		const headers = {
 			"Content-Type": "application/json",
-			"X-USBA-Token": token,
+			"X-Bot-Browser-Token": token,
 			Origin: "chrome-extension://e2e",
 		};
 

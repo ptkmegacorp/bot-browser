@@ -6,7 +6,7 @@ import { createAgentHost } from "../src/agent/session.js";
 import { DEFAULT_CODEX_MODEL, DEFAULT_CODEX_THINKING_LEVEL } from "../src/config.js";
 import { loadSyntheticHtml, TEST_ORIGIN } from "./helpers/test-page.js";
 
-const enabled = process.env.USBA_E2E_CODEX === "1";
+const enabled = process.env.BOT_BROWSER_E2E_CODEX === "1";
 
 function assistantText(messages: { role: string; content: unknown }[]): string {
 	const last = messages.filter((m) => m.role === "assistant").at(-1);

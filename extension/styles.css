@@ -294,11 +294,11 @@ select:focus-visible {
 
 @media (prefers-reduced-motion: no-preference) {
   .working-row .dot.pulse {
-    animation: usba-pulse 1.2s ease-in-out infinite;
+    animation: bot-browser-pulse 1.2s ease-in-out infinite;
   }
 }
 
-@keyframes usba-pulse {
+@keyframes bot-browser-pulse {
   0%,
   100% {
     opacity: 0.35;

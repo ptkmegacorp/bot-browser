@@ -65,13 +65,13 @@ describe("agent_disabled", () => {
 
 		await fetch(`http://127.0.0.1:${port}/api/control`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ action: "set_agent_enabled", enabled: false }),
 		});
 
 		const chat = await fetch(`http://127.0.0.1:${port}/api/chat`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ message: "hello" }),
 		});
 		expect(chat.status).toBe(409);

@@ -1,20 +1,20 @@
 {
-  "name": "ubuntu-shared-browser-agent",
+  "name": "bot-browser",
   "version": "1.0.0",
-  "description": "Ubuntu shared Chrome agent with Pi SDK backend and side-panel extension",
+  "description": "Bot Browser — shared Chrome agent with Pi SDK backend and side-panel extension",
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
     "start": "tsx src/main.ts",
     "test": "vitest run",
-    "test:e2e-live": "USBA_E2E_LIVE=1 vitest run tests/e2e-live.test.ts",
-    "test:mcp-spike": "USBA_MCP_SPIKE=1 vitest run tests/playwright-mcp-spike.test.ts",
-    "test:mcp-engine": "USBA_MCP_ENGINE=1 vitest run tests/playwright-mcp-engine.test.ts",
+    "test:e2e-live": "BOT_BROWSER_E2E_LIVE=1 vitest run tests/e2e-live.test.ts",
+    "test:mcp-spike": "BOT_BROWSER_MCP_SPIKE=1 vitest run tests/playwright-mcp-spike.test.ts",
+    "test:mcp-engine": "BOT_BROWSER_MCP_ENGINE=1 vitest run tests/playwright-mcp-engine.test.ts",
     "test:saturn-e2e-verify": "node scripts/saturn-e2e-verify.mjs",
-    "test:acceptance": "vitest run && USBA_E2E_PI=1 vitest run tests/e2e-pi-qwen.test.ts tests/e2e-handoff-pi-http.test.ts",
-    "test:acceptance:codex": "USBA_E2E_CODEX=1 vitest run tests/e2e-pi-codex.test.ts",
-    "test:acceptance:panel": "USBA_E2E_PANEL=1 vitest run tests/e2e-sidepanel.test.ts",
+    "test:acceptance": "vitest run && BOT_BROWSER_E2E_PI=1 vitest run tests/e2e-pi-qwen.test.ts tests/e2e-handoff-pi-http.test.ts",
+    "test:acceptance:codex": "BOT_BROWSER_E2E_CODEX=1 vitest run tests/e2e-pi-codex.test.ts",
+    "test:acceptance:panel": "BOT_BROWSER_E2E_PANEL=1 vitest run tests/e2e-sidepanel.test.ts",
     "icons": "bash scripts/export-icons.sh",
     "install:desktop": "bash scripts/install-icons.sh"
   },
@@ -27,12 +27,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ptkmegacorp/ubuntu-shared-browser-agent.git"
+    "url": "git+https://github.com/ptkmegacorp/bot-browser.git"
   },
   "bugs": {
-    "url": "https://github.com/ptkmegacorp/ubuntu-shared-browser-agent/issues"
+    "url": "https://github.com/ptkmegacorp/bot-browser/issues"
   },
-  "homepage": "https://github.com/ptkmegacorp/ubuntu-shared-browser-agent#readme",
+  "homepage": "https://github.com/ptkmegacorp/bot-browser#readme",
   "license": "ISC",
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^1.0.0",

@@ -4,7 +4,7 @@ Status: implementation handoff; planning only.
 
 ## Goal
 
-Turn Ubuntu Shared Browser Agent into a thin, Pi-powered shared-browser product. Introduce one small, engine-neutral browser interface and implement its first adapter with Microsoft Playwright MCP. Future engines replace the adapter while the side-panel experience, Pi agent, permissions, and tab ownership stay coherent.
+Turn Bot Browser into a thin, Pi-powered shared-browser product. Introduce one small, engine-neutral browser interface and implement its first adapter with Microsoft Playwright MCP. Future engines replace the adapter while the side-panel experience, Pi agent, permissions, and tab ownership stay coherent.
 
 ```text
 Chrome side panel → Pi tools → BrowserController (authority/lifecycle)
@@ -31,7 +31,7 @@ These defaults are agreed implementation requirements. The spike establishes how
 
 ## Existing state and working-tree safety
 
-Local project: `/home/bot/projects/ubuntu-shared-browser-agent`.
+Local project: `/home/bot/projects/bot-browser`.
 
 Observed when drafting this plan:
 

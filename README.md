@@ -1,4 +1,4 @@
-# Ubuntu Shared Browser Agent
+# Bot Browser
 
 One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through **Playwright MCP** (`@playwright/mcp@0.0.83`, in-process MCP transport), and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`; upstream MCP supplies snapshots and actions.
 
@@ -6,19 +6,19 @@ See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptan
 
 **Side panel UI:** dark chat/ledger layout with header model picker, **Agent on/off** switch, **follow active tab** (default) or pin-tab mode, bound-tab summary, in-chat working indicator, streamed messages, Stop while running, and a settings drawer. After backend changes: `npm run build` and **restart** `npm run start`; then reload the extension.
 
-**Icons / launcher (optional, Linux):** `npm run icons` exports PNGs from `assets/icon.svg`; `npm run install:desktop` installs a user-local hicolor icon and GNOME launcher. The clone path is baked in at install time via `scripts/launch-usba.sh`. Start the app from your desktop environment or `bash scripts/launch-usba.sh` so Chrome is not tied to a short-lived IDE shell.
+**Icons / launcher (optional, Linux):** `npm run icons` exports PNGs from `assets/icon.svg`; `npm run install:desktop` installs a user-local hicolor icon and GNOME launcher. The clone path is baked in at install time via `scripts/launch-bot-browser.sh`. Start the app from your desktop environment or `bash scripts/launch-bot-browser.sh` so Chrome is not tied to a short-lived IDE shell.
 
 ## Prerequisites
 
-- Linux x86_64 with Google Chrome at `/usr/bin/google-chrome` (or set `USBA_CHROME_EXECUTABLE`)
+- Linux x86_64 with Google Chrome at `/usr/bin/google-chrome` (or set `BOT_BROWSER_CHROME_EXECUTABLE`)
 - [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) config at `~/.pi/agent/` (`models.json`, `auth.json`) — credentials stay out of this repo
 - Node.js 20+
 
 ## Install
 
 ```bash
-git clone https://github.com/ptkmegacorp/ubuntu-shared-browser-agent.git
-cd ubuntu-shared-browser-agent
+git clone https://github.com/ptkmegacorp/bot-browser.git
+cd bot-browser
 npm install
 npx playwright install chromium
 ```
@@ -31,7 +31,7 @@ npm run start
 
 This:
 
-1. Ensures `~/.local/share/ubuntu-shared-browser-agent/chrome/` (mode `0700`)
+1. Ensures `~/.local/share/bot-browser/chrome/` (mode `0700`)
 2. Launches Chrome with remote debugging on port `9333` (sandbox on; no `--no-sandbox`)
 3. Opens or reuses the designated task tab at `http://127.0.0.1:9477/fixtures/welcome.html`
 4. Listens on `http://127.0.0.1:9477` with pairing token printed once at startup
@@ -40,7 +40,7 @@ This:
 
 On **Google Chrome 137+**, `--load-extension` is ignored. The backend loads the repo’s `extension/` folder over CDP (`Extensions.loadUnpacked`) and passes `--enable-unsafe-extension-debugging`.
 
-1. Open the **Agent** Chrome window (puzzle icon → **Ubuntu Shared Browser Agent**).
+1. Open the **Agent** Chrome window (puzzle icon → **Bot Browser**).
 2. Open the side panel from that extension action.
 3. Paste the pairing token from the backend log into the side panel settings and save.
 
@@ -51,12 +51,12 @@ If `chrome://extensions` looks empty on Chrome 154, that can be normal until the
 ```bash
 npm test
 npm run build
-npm run test:mcp-spike       # Phase 0 spike (USBA_MCP_SPIKE=1); dedicated headless Chrome
-npm run test:mcp-engine      # PlaywrightMcpEngine + controller seam (USBA_MCP_ENGINE=1)
+npm run test:mcp-spike       # Phase 0 spike (BOT_BROWSER_MCP_SPIKE=1); dedicated headless Chrome
+npm run test:mcp-engine      # PlaywrightMcpEngine + controller seam (BOT_BROWSER_MCP_ENGINE=1)
 npm run test:saturn-e2e-verify   # optional Saturn manual E2E: live Agent Chrome + Pi chat on fixtures
-npm run test:e2e-live        # optional: Pi model catalog (USBA_E2E_LIVE=1)
-npm run test:acceptance      # + real Pi/Qwen HTTP E2E (USBA_E2E_PI=1)
-npm run test:acceptance:codex  # Codex OAuth smoke (USBA_E2E_CODEX=1)
+npm run test:e2e-live        # optional: Pi model catalog (BOT_BROWSER_E2E_LIVE=1)
+npm run test:acceptance      # + real Pi/Qwen HTTP E2E (BOT_BROWSER_E2E_PI=1)
+npm run test:acceptance:codex  # Codex OAuth smoke (BOT_BROWSER_E2E_CODEX=1)
 npm run test:acceptance:panel  # open side panel + dedicated Chrome + real model; synthetic fixtures only
 ```
 
@@ -66,11 +66,11 @@ See [VERIFICATION.md](./VERIFICATION.md) and [SPIKE_REPORT.md](./SPIKE_REPORT.md
 
 | Variable | Default |
 |----------|---------|
-| `USBA_PORT` | `9477` |
-| `USBA_HOST` | `127.0.0.1` |
-| `USBA_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
-| `USBA_BROWSER_ENGINE` | `playwright-mcp` (production). Set to `fake` for tests that inject `FakeBrowserEngine` via the controller constructor. |
-| `USBA_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
+| `BOT_BROWSER_PORT` | `9477` |
+| `BOT_BROWSER_HOST` | `127.0.0.1` |
+| `BOT_BROWSER_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
+| `BOT_BROWSER_BROWSER_ENGINE` | `playwright-mcp` (production). Set to `fake` for tests that inject `FakeBrowserEngine` via the controller constructor. |
+| `BOT_BROWSER_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
 
 ## License
 

@@ -15,7 +15,7 @@ import {
 	type DedicatedCdpSession,
 } from "./helpers/mcp-spike-harness.js";
 
-const engineTestsEnabled = process.env.USBA_MCP_ENGINE === "1";
+const engineTestsEnabled = process.env.BOT_BROWSER_MCP_ENGINE === "1";
 const SPIKE_ORIGIN = "http://127.0.0.1";
 const DUP_PATH = "/engine-dup-url";
 
@@ -39,13 +39,13 @@ async function openSameUrlTab(sessionBrowser: Browser, marker: string) {
 	}, marker);
 }
 
-describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (USBA_MCP_ENGINE=1)", () => {
+describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (BOT_BROWSER_MCP_ENGINE=1)", () => {
 	let session: DedicatedCdpSession;
 	let outputDir: string;
 
 	beforeEach(async () => {
 		session = await launchDedicatedCdpBrowser();
-		outputDir = await mkdtemp(join(tmpdir(), "usba-mcp-engine-out-"));
+		outputDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-engine-out-"));
 	});
 
 	afterEach(async () => {

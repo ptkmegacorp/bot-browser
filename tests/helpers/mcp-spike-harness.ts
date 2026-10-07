@@ -41,7 +41,7 @@ export interface DedicatedCdpSession {
 
 /** Headless dedicated Chrome for destructive spike tests (never touches Agent Chrome). */
 export async function launchDedicatedCdpBrowser(): Promise<DedicatedCdpSession> {
-	const userDataDir = await mkdtemp(join(tmpdir(), "usba-mcp-spike-"));
+	const userDataDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-spike-"));
 	const port = await pickFreePort();
 	const persistent = await chromium.launchPersistentContext(userDataDir, {
 		headless: true,
@@ -102,7 +102,7 @@ export async function createInProcessMcpClient(config: Config): Promise<McpSpike
 	const server = await createConnection(config);
 	const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
 	await server.connect(serverTransport);
-	const client = new Client({ name: "usba-mcp-spike", version: "1.0.0" });
+	const client = new Client({ name: "bot-browser-mcp-spike", version: "1.0.0" });
 	await client.connect(clientTransport);
 	return {
 		client,

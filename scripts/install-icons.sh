@@ -6,13 +6,13 @@ ICON_THEME="${XDG_DATA_HOME:-$HOME/.local/share}/icons/hicolor"
 for size in 16 32 48 128 256; do
   dir="$ICON_THEME/${size}x${size}/apps"
   mkdir -p "$dir"
-  cp "$ROOT/extension/icons/icon-${size}.png" "$dir/ubuntu-shared-browser-agent.png"
+  cp "$ROOT/extension/icons/icon-${size}.png" "$dir/bot-browser.png"
 done
 DESKTOP_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 mkdir -p "$DESKTOP_DIR"
-sed "s|@REPO_ROOT@|$ROOT|g" "$ROOT/assets/ubuntu-shared-browser-agent.desktop" > "$DESKTOP_DIR/ubuntu-shared-browser-agent.desktop"
-chmod +x "$DESKTOP_DIR/ubuntu-shared-browser-agent.desktop"
-chmod +x "$ROOT/scripts/launch-usba.sh"
+sed "s|@REPO_ROOT@|$ROOT|g" "$ROOT/assets/bot-browser.desktop" > "$DESKTOP_DIR/bot-browser.desktop"
+chmod +x "$DESKTOP_DIR/bot-browser.desktop"
+chmod +x "$ROOT/scripts/launch-bot-browser.sh"
 if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 	gtk-update-icon-cache -f -t "$ICON_THEME" 2>/dev/null || true
 fi

@@ -66,7 +66,7 @@ describe("no_tab_attached", () => {
 
 		const res = await fetch(`http://127.0.0.1:${port}/api/chat`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json", "X-USBA-Token": token },
+			headers: { "Content-Type": "application/json", "X-Bot-Browser-Token": token },
 			body: JSON.stringify({ message: "what is on the page" }),
 		});
 		const body = await res.json();
@@ -75,7 +75,7 @@ describe("no_tab_attached", () => {
 		expect(promptCalls).toBe(0);
 
 		const status = await fetch(`http://127.0.0.1:${port}/api/status`, {
-			headers: { "X-USBA-Token": token },
+			headers: { "X-Bot-Browser-Token": token },
 		}).then((r) => r.json());
 		expect(status.tabAttached).toBe(false);
 		expect(status.taskTab).toBeNull();

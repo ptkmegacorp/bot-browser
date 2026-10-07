@@ -5,7 +5,7 @@ import { FakeBrowserEngine } from "./engines/fake-engine.js";
 import { PlaywrightMcpEngine } from "./engines/playwright-mcp.js";
 
 export function createBrowserEngine(cdpPort: number): BrowserEngine {
-	if (process.env.USBA_BROWSER_ENGINE === "fake") {
+	if (process.env.BOT_BROWSER_BROWSER_ENGINE === "fake") {
 		return new FakeBrowserEngine();
 	}
 	return new PlaywrightMcpEngine({
