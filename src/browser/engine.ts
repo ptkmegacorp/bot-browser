@@ -1,4 +1,5 @@
 import type { ControlDescriptor } from "./safety.js";
+import type { PageFacts } from "./verification.js";
 
 /** Distinguishable failure codes for controller policy and Pi tools. */
 export type EngineErrorCode =
@@ -100,6 +101,9 @@ export interface BrowserEngine {
 
 	/** Trusted introspection of the referenced control for safety preflight. */
 	describeControl(ref: string, ctx: RefOperationContext): Promise<EngineOutcome<ControlDescriptor>>;
+
+	/** Cheap read-only page facts for action verification. Never affects observations. */
+	readPageFacts(): Promise<EngineOutcome<PageFacts>>;
 
 	/** Invalidate observations and reject queued / in-flight work where possible. */
 	cancel(): void;

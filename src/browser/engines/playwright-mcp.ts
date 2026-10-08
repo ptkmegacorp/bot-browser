@@ -15,6 +15,7 @@ import {
 	truncateObservationText,
 } from "../engine.js";
 import type { ControlDescriptor } from "../safety.js";
+import type { PageFacts } from "../verification.js";
 import { focusAndSelectCdpTarget } from "./cdp-tab-index.js";
 import {
 	createInProcessMcpSession,
@@ -55,8 +56,21 @@ const DESCRIBE_CONTROL_FN = `(element) => {
     "";
   const autocomplete = el.getAttribute("autocomplete");
   const name = el.getAttribute("name");
-  return JSON.stringify({ tag, type, role, inForm, label, autocomplete, name });
+  let value;
+  if ("value" in el && typeof el.value === "string") value = el.value;
+  else {
+    const attr = el.getAttribute("value");
+    if (attr) value = attr;
+  }
+  return JSON.stringify({ tag, type, role, inForm, label, autocomplete, name, value });
 }`;
+
+const READ_PAGE_FACTS_FN = `() => JSON.stringify({ readyState: document.readyState, title: document.title,
+  url: location.href, textLength: document.body?.innerText?.length ?? 0,
+  textHead: (document.body?.innerText ?? "").trim().slice(0, 400),
+  scrollY: Math.round(window.scrollY),
+  scrollHeight: Math.round(document.documentElement.scrollHeight),
+  viewportHeight: Math.round(window.innerHeight) })`;
 
 export class PlaywrightMcpEngine implements BrowserEngine {
 	private session: McpClientSession | null = null;
@@ -357,6 +371,32 @@ export class PlaywrightMcpEngine implements BrowserEngine {
 				return this.fail("not_implemented", "screenshot response had no image payload");
 			}
 			return { ok: true, data: { mimeType: "image/png", base64 } };
+		});
+	}
+
+	async readPageFacts(): Promise<EngineOutcome<PageFacts>> {
+		return this.enqueue(async (epoch, signal) => {
+			if (!this.targetId) return this.fail("not_bound");
+			const client = await this.ensureSession();
+			const tab = await this.ensureTargetSelected(client, this.targetId);
+			if (!tab.ok) return tab;
+			const result = await mcpCallTool(
+				client,
+				"browser_evaluate",
+				{ function: READ_PAGE_FACTS_FN },
+				signal,
+			);
+			if (signal.aborted || epoch !== this.operationEpoch) return this.fail("operation_cancelled");
+			if (result.isError) {
+				return this.fail("timeout", mcpToolText(result) || "readPageFacts failed");
+			}
+			const text = parseMcpEvaluateJson(mcpToolText(result)).trim();
+			try {
+				const parsed = JSON.parse(text) as PageFacts;
+				return { ok: true, data: parsed };
+			} catch {
+				return this.fail("not_implemented", "could not parse page facts");
+			}
 		});
 	}
 

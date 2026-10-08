@@ -7,7 +7,14 @@ import { createBrowserEngine } from "./create-engine.js";
 import { PlaywrightPageEngine } from "./engines/playwright-page.js";
 import { OriginScope, originFromUrl } from "./origin-scope.js";
 import { bumpDocumentGeneration, currentDocumentGeneration, type PageSnapshot } from "./snapshot.js";
-import { isConsequentialControl, isSensitiveField } from "./safety.js";
+import { isConsequentialControl, isSensitiveField, maskFieldValue } from "./safety.js";
+import type { ActionVerification } from "./verification.js";
+import {
+	classifyPageLoad,
+	describeClickNavigation,
+	describeFieldValue,
+	describeScroll,
+} from "./verification.js";
 
 export type AgentControlMode = "idle" | "running" | "paused" | "human_handoff";
 
@@ -200,6 +207,10 @@ export class BrowserController {
 		return this.mode !== "paused" && this.mode !== "human_handoff";
 	}
 
+	private maybeVerify(): boolean {
+		return this.observationsAllowed();
+	}
+
 	private assertObservationsAllowed(): void {
 		this.assertAgentEnabled();
 		if (!this.observationsAllowed()) throw new Error("observations_paused");
@@ -386,7 +397,7 @@ export class BrowserController {
 		});
 	}
 
-	async navigate(url: string): Promise<{ url: string }> {
+	async navigate(url: string): Promise<{ url: string; verification?: ActionVerification }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 			return this.withBound(async () => {
@@ -401,12 +412,20 @@ export class BrowserController {
 				const redirect = this.originScope.checkRedirect(before || url, after);
 				if (!redirect.ok) throw new Error(redirect.reason);
 				this.invalidateObservations();
-				return { url: after };
+				let verification: ActionVerification | undefined;
+				if (this.maybeVerify()) {
+					const facts = assertEngineOk(await this.engine.readPageFacts());
+					verification = classifyPageLoad(facts, url);
+				}
+				return { url: after, verification };
 			});
 		});
 	}
 
-	async click(ref: string, generation: number): Promise<{ ok: boolean; blocked?: string }> {
+	async click(
+		ref: string,
+		generation: number,
+	): Promise<{ ok: boolean; blocked?: string; verification?: ActionVerification }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 			return this.withBound(async () => {
@@ -417,15 +436,29 @@ export class BrowserController {
 				if (isConsequentialControl(desc)) {
 					return { ok: false, blocked: "risky_click_requires_human" };
 				}
+				const beforeBinding = await this.engine.getBindingState();
+				const before = { url: beforeBinding.url ?? "", title: beforeBinding.title ?? "" };
 				assertEngineOk(await this.engine.click(ref, ctx));
 				await this.revalidateBoundOriginAfterAction();
+				let verification: ActionVerification | undefined;
+				if (this.maybeVerify()) {
+					const afterBinding = await this.engine.getBindingState();
+					verification = describeClickNavigation(before, {
+						url: afterBinding.url ?? "",
+						title: afterBinding.title ?? "",
+					});
+				}
 				this.invalidateObservations();
-				return { ok: true };
+				return { ok: true, verification };
 			});
 		});
 	}
 
-	async fill(ref: string, generation: number, text: string): Promise<{ ok: boolean; blocked?: string }> {
+	async fill(
+		ref: string,
+		generation: number,
+		text: string,
+	): Promise<{ ok: boolean; blocked?: string; verification?: ActionVerification }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 			return this.withBound(async () => {
@@ -437,30 +470,64 @@ export class BrowserController {
 					return { ok: false, blocked: "sensitive_field_human_only" };
 				}
 				assertEngineOk(await this.engine.fill(ref, ctx, text));
-				return { ok: true };
+				let verification: ActionVerification | undefined;
+				if (this.maybeVerify()) {
+					const readback = assertEngineOk(await this.engine.describeControl(ref, ctx));
+					const masked = maskFieldValue(
+						readback.type,
+						readback.autocomplete ?? null,
+						readback.name ?? null,
+						readback.value ?? "",
+					);
+					verification = describeFieldValue(readback.label, masked, text);
+				}
+				return { ok: true, verification };
 			});
 		});
 	}
 
-	async selectOption(ref: string, generation: number, value: string): Promise<{ ok: boolean }> {
+	async selectOption(
+		ref: string,
+		generation: number,
+		value: string,
+	): Promise<{ ok: boolean; verification?: ActionVerification }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 			return this.withBound(async () => {
 				this.validateRef(generation, ref);
 				const ctx = this.refContext(generation);
 				assertEngineOk(await this.engine.selectOption(ref, ctx, value));
+				let verification: ActionVerification | undefined;
+				if (this.maybeVerify()) {
+					const readback = assertEngineOk(await this.engine.describeControl(ref, ctx));
+					const masked = maskFieldValue(
+						readback.type,
+						readback.autocomplete ?? null,
+						readback.name ?? null,
+						readback.value ?? "",
+					);
+					verification = describeFieldValue(readback.label, masked, value);
+				}
 				this.invalidateObservations();
-				return { ok: true };
+				return { ok: true, verification };
 			});
 		});
 	}
 
-	async scroll(direction: "up" | "down"): Promise<{ ok: boolean }> {
+	async scroll(direction: "up" | "down"): Promise<{ ok: boolean; verification?: ActionVerification }> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) throw new Error("operation_cancelled");
 			return this.withBound(async () => {
-				assertEngineOk(await this.engine.scroll(direction));
-				return { ok: true };
+				let verification: ActionVerification | undefined;
+				if (this.maybeVerify()) {
+					const beforeFacts = assertEngineOk(await this.engine.readPageFacts());
+					assertEngineOk(await this.engine.scroll(direction));
+					const afterFacts = assertEngineOk(await this.engine.readPageFacts());
+					verification = describeScroll(afterFacts, beforeFacts.scrollY);
+				} else {
+					assertEngineOk(await this.engine.scroll(direction));
+				}
+				return { ok: true, verification };
 			});
 		});
 	}

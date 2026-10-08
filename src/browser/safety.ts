@@ -38,6 +38,7 @@ export interface ControlDescriptor {
 	label: string;
 	autocomplete?: string | null;
 	name?: string | null;
+	value?: string;
 }
 
 export function isRiskyClickLabel(label: string): boolean {

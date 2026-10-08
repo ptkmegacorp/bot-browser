@@ -11,6 +11,7 @@ import {
 	truncateObservationText,
 } from "../engine.js";
 import type { ControlDescriptor } from "../safety.js";
+import type { PageFacts } from "../verification.js";
 
 export interface FakePageElement {
 	ref: string;
@@ -23,6 +24,8 @@ export interface FakePageElement {
 	autocomplete?: string | null;
 	inForm?: boolean;
 	options?: string[];
+	/** When set, describeControl returns this instead of el.value (tests only). */
+	readbackValue?: string;
 }
 
 export interface FakePageState {
@@ -30,6 +33,12 @@ export interface FakePageState {
 	title: string;
 	bodyText: string;
 	elements: FakePageElement[];
+	readyState?: string;
+	textLength?: number;
+	textHead?: string;
+	scrollY?: number;
+	scrollHeight?: number;
+	viewportHeight?: number;
 }
 
 const DEFAULT_PAGE: FakePageState = {
@@ -48,6 +57,7 @@ export class FakeBrowserEngine implements BrowserEngine {
 	private lastObservation: EngineObservation | null = null;
 	private actionQueue: Promise<void> = Promise.resolve();
 	private observeHold: (() => Promise<void>) | null = null;
+	private mutationHold: (() => Promise<void>) | null = null;
 	private disposed = false;
 
 	constructor(initial?: Partial<FakePageState>) {
@@ -58,14 +68,39 @@ export class FakeBrowserEngine implements BrowserEngine {
 		this.observeHold = hold;
 	}
 
+	forTestingHoldMutation(hold: () => Promise<void>): void {
+		this.mutationHold = hold;
+	}
+
 	setPage(partial: Partial<FakePageState>): void {
 		this.page = {
 			url: partial.url ?? this.page.url,
 			title: partial.title ?? this.page.title,
 			bodyText: partial.bodyText ?? this.page.bodyText,
 			elements: (partial.elements ?? this.page.elements).map((el) => ({ ...el })),
+			readyState: partial.readyState ?? this.page.readyState,
+			textLength: partial.textLength ?? this.page.textLength,
+			textHead: partial.textHead ?? this.page.textHead,
+			scrollY: partial.scrollY ?? this.page.scrollY,
+			scrollHeight: partial.scrollHeight ?? this.page.scrollHeight,
+			viewportHeight: partial.viewportHeight ?? this.page.viewportHeight,
 		};
 		this.invalidateObservations();
+	}
+
+	private buildPageFacts(): PageFacts {
+		const body = this.page.bodyText;
+		const trimmed = body.trim();
+		return {
+			url: this.page.url,
+			title: this.page.title,
+			readyState: this.page.readyState ?? "complete",
+			textLength: this.page.textLength ?? trimmed.length,
+			textHead: this.page.textHead ?? trimmed.slice(0, 400),
+			scrollY: this.page.scrollY ?? 0,
+			scrollHeight: this.page.scrollHeight ?? 800,
+			viewportHeight: this.page.viewportHeight ?? 600,
+		};
 	}
 
 	private invalidateObservations(): void {
@@ -200,6 +235,7 @@ export class FakeBrowserEngine implements BrowserEngine {
 				this.page.title = url;
 			}
 			this.invalidateObservations();
+			if (this.mutationHold) await this.mutationHold();
 			return { ok: true, data: { url: this.page.url } };
 		});
 	}
@@ -231,6 +267,7 @@ export class FakeBrowserEngine implements BrowserEngine {
 				const node = this.lastObservation.refs.find((r) => r.ref === ref);
 				if (node) node.value = text;
 			}
+			if (this.mutationHold) await this.mutationHold();
 			return { ok: true, data: { filled: true } };
 		});
 	}
@@ -255,10 +292,18 @@ export class FakeBrowserEngine implements BrowserEngine {
 		});
 	}
 
-	async scroll(_direction: "up" | "down"): Promise<EngineOutcome<{ scrolled: true }>> {
+	async scroll(direction: "up" | "down"): Promise<EngineOutcome<{ scrolled: true }>> {
 		return this.enqueue(async (epoch) => {
 			if (epoch !== this.operationEpoch) return this.fail("operation_cancelled");
 			if (!this.targetId) return this.fail("not_bound");
+			const viewport = this.page.viewportHeight ?? 600;
+			const maxScroll = Math.max(0, (this.page.scrollHeight ?? 800) - viewport);
+			const current = this.page.scrollY ?? 0;
+			if (direction === "down") {
+				this.page.scrollY = Math.min(current + viewport, maxScroll);
+			} else {
+				this.page.scrollY = Math.max(current - viewport, 0);
+			}
 			return { ok: true, data: { scrolled: true } };
 		});
 	}
@@ -273,6 +318,11 @@ export class FakeBrowserEngine implements BrowserEngine {
 		});
 	}
 
+	async readPageFacts(): Promise<EngineOutcome<PageFacts>> {
+		if (!this.targetId) return this.fail("not_bound");
+		return { ok: true, data: this.buildPageFacts() };
+	}
+
 	async describeControl(ref: string, ctx: RefOperationContext): Promise<EngineOutcome<ControlDescriptor>> {
 		if (!this.targetId) return this.fail("not_bound");
 		const check = this.validateRef(ctx, ref);
@@ -285,6 +335,7 @@ export class FakeBrowserEngine implements BrowserEngine {
 			role: el.role,
 			inForm: el.inForm ?? false,
 			label: el.name,
+			value: el.readbackValue ?? el.value,
 		};
 		return { ok: true, data: desc };
 	}

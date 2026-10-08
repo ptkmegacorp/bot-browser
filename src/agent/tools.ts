@@ -1,6 +1,12 @@
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { BrowserController } from "../browser/controller.js";
+import type { ActionVerification } from "../browser/verification.js";
+
+function withVerificationLine(firstLine: string, verification?: ActionVerification): string {
+	if (!verification) return firstLine;
+	return `${firstLine}\nverification: ${verification.summary}`;
+}
 
 const Ref = Type.String({ description: "Element ref from page_snapshot (e.g. e3)" });
 const Generation = Type.Number({ description: "Snapshot generation from the page_snapshot that produced this ref" });
@@ -44,7 +50,9 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 		async execute(_id, params) {
 			const result = await controller.navigate(params.url);
 			return {
-				content: [{ type: "text", text: `navigated: ${result.url}` }],
+				content: [
+					{ type: "text", text: withVerificationLine(`navigated: ${result.url}`, result.verification) },
+				],
 				details: result,
 			};
 		},
@@ -64,7 +72,10 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 					details: result,
 				};
 			}
-			return { content: [{ type: "text", text: "clicked" }], details: result };
+			return {
+				content: [{ type: "text", text: withVerificationLine("clicked", result.verification) }],
+				details: result,
+			};
 		},
 	});
 
@@ -85,7 +96,10 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 					details: result,
 				};
 			}
-			return { content: [{ type: "text", text: "filled" }], details: result };
+			return {
+				content: [{ type: "text", text: withVerificationLine("filled", result.verification) }],
+				details: result,
+			};
 		},
 	});
 
@@ -100,7 +114,10 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 		}),
 		async execute(_id, params) {
 			const result = await controller.selectOption(params.ref, params.generation, params.value);
-			return { content: [{ type: "text", text: "selected" }], details: result };
+			return {
+				content: [{ type: "text", text: withVerificationLine("selected", result.verification) }],
+				details: result,
+			};
 		},
 	});
 
@@ -112,8 +129,16 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 			direction: Type.Union([Type.Literal("up"), Type.Literal("down")]),
 		}),
 		async execute(_id, params) {
-			await controller.scroll(params.direction);
-			return { content: [{ type: "text", text: `scrolled ${params.direction}` }], details: {} };
+			const result = await controller.scroll(params.direction);
+			return {
+				content: [
+					{
+						type: "text",
+						text: withVerificationLine(`scrolled ${params.direction}`, result.verification),
+					},
+				],
+				details: result,
+			};
 		},
 	});
 

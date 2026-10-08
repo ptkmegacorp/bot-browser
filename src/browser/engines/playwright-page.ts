@@ -13,6 +13,7 @@ import {
 import { collectInteractiveElements, ElementRegistry } from "../element-registry.js";
 import { buildSnapshotFromHandles, MAX_SNAPSHOT_NODES } from "../snapshot.js";
 import type { ControlDescriptor } from "../safety.js";
+import type { PageFacts } from "../verification.js";
 import { getCdpTargetId } from "../cdp-page.js";
 
 /** Synthetic target id used by BrowserController.forTestingAttachPage. */
@@ -227,6 +228,23 @@ export class PlaywrightPageEngine implements BrowserEngine {
 		return { ok: true, data: { mimeType: "image/png", base64: buf.toString("base64") } };
 	}
 
+	async readPageFacts(): Promise<EngineOutcome<PageFacts>> {
+		if (!this.targetId) return this.fail("not_bound");
+		const facts = await this.page.evaluate(() => {
+			return {
+				readyState: document.readyState,
+				title: document.title,
+				url: location.href,
+				textLength: document.body?.innerText?.length ?? 0,
+				textHead: (document.body?.innerText ?? "").trim().slice(0, 400),
+				scrollY: Math.round(window.scrollY),
+				scrollHeight: Math.round(document.documentElement.scrollHeight),
+				viewportHeight: Math.round(window.innerHeight),
+			};
+		});
+		return { ok: true, data: facts };
+	}
+
 	async describeControl(ref: string, ctx: RefOperationContext): Promise<EngineOutcome<ControlDescriptor>> {
 		if (!this.targetId) return this.fail("not_bound");
 		const check = this.validateRef(ctx, ref);
@@ -249,7 +267,14 @@ export class PlaywrightPageEngine implements BrowserEngine {
 					"";
 				const autocomplete = el.getAttribute("autocomplete");
 				const name = el.getAttribute("name");
-				return { tag, type, role, inForm, label, autocomplete, name };
+				let value: string | undefined;
+				if ("value" in el && typeof (el as HTMLInputElement).value === "string") {
+					value = (el as HTMLInputElement).value;
+				} else {
+					const attr = el.getAttribute("value");
+					if (attr) value = attr;
+				}
+				return { tag, type, role, inForm, label, autocomplete, name, value };
 			});
 			return { ok: true, data: desc };
 		} catch (err) {
