@@ -192,12 +192,78 @@ select:focus-visible {
   flex-shrink: 0;
 }
 
-.allow-all-row {
-  display: flex;
+.allow-all-pill {
+  display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-bottom: 0.35rem;
-  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  border-radius: 999px;
+  padding: 0.32rem 0.65rem;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.allow-all-pill:has(.allow-all-pill-input:checked) {
+  border-color: var(--accent);
+  background: #2a3548;
+  color: var(--text);
+}
+
+.allow-all-pill:has(.allow-all-pill-input:disabled) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.allow-all-pill-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.allow-all-pill-track {
+  width: 1.65rem;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: var(--border);
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+
+.allow-all-pill-track::after {
+  content: "";
+  position: absolute;
+  top: 0.12rem;
+  left: 0.12rem;
+  width: 0.66rem;
+  height: 0.66rem;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.allow-all-pill:has(.allow-all-pill-input:checked) .allow-all-pill-track {
+  background: var(--accent-dim);
+}
+
+.allow-all-pill:has(.allow-all-pill-input:checked) .allow-all-pill-track::after {
+  transform: translateX(0.75rem);
+  background: #fff;
+}
+
+.allow-all-pill-label {
+  white-space: nowrap;
 }
 
 .tab-host {
@@ -401,8 +467,14 @@ select:focus-visible {
 
 .composer-actions {
   display: flex;
+  align-items: center;
   gap: 0.35rem;
   margin-top: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.composer-actions #sendBtn {
+  margin-left: auto;
 }
 
 .primary-btn,

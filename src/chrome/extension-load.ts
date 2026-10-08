@@ -12,9 +12,7 @@ export async function ensureBundledExtensionLoaded(port = DEFAULT_CDP_PORT): Pro
 	const session = await browser.newBrowserCDPSession();
 	try {
 		const listed = await session.send("Extensions.getExtensions", {});
-		const already = listed.extensions?.find(
-			(e) => e.path === extDir || e.name === "Bot Browser",
-		);
+		const already = listed.extensions?.find((e) => e.path === extDir);
 		if (already?.enabled) return already.id;
 
 		const { id } = await session.send("Extensions.loadUnpacked", { path: extDir });

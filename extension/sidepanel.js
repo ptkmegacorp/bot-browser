@@ -224,12 +224,23 @@ function focusComposer() {
 	}
 }
 
+function syncAllowAllPill() {
+	const input = $("allowAllSites");
+	const pill = $("allowAllSitesPill");
+	if (!input || !pill) return;
+	pill.setAttribute("aria-checked", input.checked ? "true" : "false");
+}
+
 function updateComposerForMode() {
 	const running = state.mode === "running" || state.chatInFlight;
 	$("stopBtn").hidden = !running;
 	$("sendBtn").hidden = running;
 	const blocked = !state.agentEnabled || !state.tabAttached || state.connection !== "connected";
 	$("sendBtn").disabled = running || blocked;
+	const allowInput = $("allowAllSites");
+	if (allowInput) {
+		allowInput.disabled = state.connection !== "connected" || running;
+	}
 }
 
 async function loadSettings() {
@@ -256,6 +267,7 @@ async function loadSettings() {
 		$("allowAllSites").checked = true;
 		state.originPolicyMode = "all_public_web";
 	}
+	syncAllowAllPill();
 }
 
 async function saveSettings() {
@@ -576,9 +588,11 @@ function updatePermissionCue() {
 
 function updatePermissionUi() {
 	const all = state.originPolicyMode === "all_public_web";
+	$("allowAllSites").checked = all;
+	syncAllowAllPill();
 	$("allowAllSitesStatus").textContent = all
 		? "All sites allowed — public http(s) sites in the selected tab. Local/private hosts still need explicit approval below."
-		: "Only explicitly approved sites are allowed.";
+		: "Only explicitly approved sites are allowed. Use the Allow all sites control next to Send.";
 	updatePermissionCue();
 }
 
@@ -691,6 +705,7 @@ $("agentEnabledSwitch").addEventListener("click", async () => {
 	await setAgentEnabled(!state.agentEnabled);
 });
 
+$("allowAllSitesPill").setAttribute("role", "switch");
 $("allowAllSites").addEventListener("change", async (e) => {
 	const wantAll = e.target.checked;
 	if (wantAll) {
@@ -699,11 +714,13 @@ $("allowAllSites").addEventListener("change", async (e) => {
 		);
 		if (!ok) {
 			e.target.checked = false;
+			syncAllowAllPill();
 			return;
 		}
 	}
 	const mode = wantAll ? "all_public_web" : "approved_only";
 	state.originPolicyMode = mode;
+	syncAllowAllPill();
 	await saveSettings();
 	await control("set_origin_policy", { originPolicyMode: mode });
 	updatePermissionUi();

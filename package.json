@@ -16,7 +16,10 @@
     "test:acceptance:codex": "BOT_BROWSER_E2E_CODEX=1 vitest run tests/e2e-pi-codex.test.ts",
     "test:acceptance:panel": "BOT_BROWSER_E2E_PANEL=1 vitest run tests/e2e-sidepanel.test.ts",
     "icons": "bash scripts/export-icons.sh",
-    "install:desktop": "bash scripts/install-icons.sh"
+    "install:desktop": "bash scripts/install-icons.sh",
+    "ensure-extension": "tsx scripts/ensure-extension.mts",
+    "verify-extension": "tsx scripts/verify-extension-loaded.mts",
+    "test:e2e-dock-extension": "bash scripts/e2e-dock-extension.sh"
   },
   "keywords": [
     "chrome",

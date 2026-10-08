@@ -12,6 +12,7 @@ import type { BrowserController } from "../browser/controller.js";
 import { cdpUrl } from "../config.js";
 import { originFromUrl, type OriginPolicyMode } from "../browser/origin-scope.js";
 import { listCdpPages } from "../chrome/cdp.js";
+import { ensureBundledExtensionLoaded } from "../chrome/extension-load.js";
 import type { ChromeRuntimeState } from "../chrome/state.js";
 import { assertJsonSize, parseAuth } from "./auth.js";
 import {
@@ -143,6 +144,26 @@ export function createAppServer(deps: ServerDeps) {
 				clients.add(res);
 				req.on("close", () => clients.delete(res));
 				res.write(`data: ${JSON.stringify({ type: "hello" })}\n\n`);
+				return;
+			}
+
+			if (url.pathname === "/api/extension/ensure" && (req.method === "POST" || req.method === "GET")) {
+				const auth = authorize(req);
+				if (!auth.ok) {
+					json(res, 401, { error: auth.reason });
+					return;
+				}
+				try {
+					const id = await ensureBundledExtensionLoaded(deps.chromeState.cdpPort);
+					if (!id) {
+						json(res, 500, { error: "extension_not_loaded" });
+						return;
+					}
+					json(res, 200, { ok: true, id, name: "Bot Browser" });
+				} catch (err) {
+					const message = err instanceof Error ? err.message : "extension_load_failed";
+					json(res, 503, { error: "extension_load_failed", message });
+				}
 				return;
 			}
 

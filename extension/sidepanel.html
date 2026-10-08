@@ -47,6 +47,11 @@
         <label class="visually-hidden" for="message">Message</label>
         <textarea id="message" rows="2" placeholder="Ask the agent…" autocomplete="off"></textarea>
         <div class="composer-actions">
+          <label class="allow-all-pill" id="allowAllSitesPill" title="Let the agent use any public http(s) site in the task tab">
+            <input type="checkbox" id="allowAllSites" class="allow-all-pill-input" />
+            <span class="allow-all-pill-track" aria-hidden="true"></span>
+            <span class="allow-all-pill-label">Allow all sites</span>
+          </label>
           <button type="submit" id="sendBtn" class="primary-btn">Send</button>
           <button type="button" id="stopBtn" class="danger-btn" hidden>Stop</button>
         </div>
@@ -84,10 +89,6 @@
         </section>
         <section class="settings-section" data-section="permissions">
           <h3>Site permissions</h3>
-          <label class="allow-all-row">
-            <input type="checkbox" id="allowAllSites" />
-            Allow all sites
-          </label>
           <p id="allowAllSitesStatus" class="help-text"></p>
           <ul id="originList" class="origin-list"></ul>
           <label>Approve origin

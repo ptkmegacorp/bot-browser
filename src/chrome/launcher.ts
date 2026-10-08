@@ -182,11 +182,11 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 	if (prior && isPidAlive(prior.pid) && prior.cdpPort === port && (await cdpHealthy(base))) {
 		try {
 			await assertCdpOwnership(profile, port);
-			try {
-				await ensureBundledExtensionLoaded(port);
-			} catch {
-				/* ignore */
-			}
+			const extId = await ensureBundledExtensionLoaded(port).catch((err) => {
+				console.error("extension_load_failed:", err instanceof Error ? err.message : err);
+				return undefined;
+			});
+			if (extId) console.log(`Extension loaded: ${extId}`);
 			const tab = await pickOrCreateTaskTab(base, prior.taskTargetId, welcome);
 			const state: ChromeRuntimeState = {
 				...prior,
@@ -207,11 +207,11 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 		const pid = runningPids[0]!;
 		try {
 			await assertCdpOwnership(profile, port);
-			try {
-				await ensureBundledExtensionLoaded(port);
-			} catch {
-				/* ignore */
-			}
+			const extId = await ensureBundledExtensionLoaded(port).catch((err) => {
+				console.error("extension_load_failed:", err instanceof Error ? err.message : err);
+				return undefined;
+			});
+			if (extId) console.log(`Extension loaded: ${extId}`);
 			const tab = await pickOrCreateTaskTab(base, prior?.taskTargetId, welcome);
 			const state: ChromeRuntimeState = {
 				pid,
