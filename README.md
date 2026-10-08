@@ -4,9 +4,9 @@ One visible system Google Chrome window (profile display name **Agent**), one bo
 
 See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria. See [VERIFICATION.md](./VERIFICATION.md) for how to run automated and manual checks.
 
-**Side panel UI:** dark chat/ledger layout with header model picker, **Agent on/off** switch, **follow active tab** (default) or pin-tab mode, bound-tab summary, in-chat working indicator, streamed messages, Stop while running, and a settings drawer. After backend changes: `npm run build` and **restart** `npm run start`; then reload the extension.
+**Side panel UI:** dark chat/ledger layout with header model picker, **Agent on/off** switch, **follow active tab** (default) or pin-tab mode, bound-tab summary, in-chat working indicator, streamed messages, Stop while running, and a settings drawer. After backend changes: **`npm run bb redeploy`** (or `bb restart` for a full stack reset), then reload the extension in Chrome.
 
-**Icons / launcher (optional, Linux):** `npm run icons` exports PNGs from `assets/icon.svg`; `npm run install:desktop` installs a user-local hicolor icon and GNOME launcher. The clone path is baked in at install time via `scripts/launch-bot-browser.sh`. Start the app from your desktop environment or `bash scripts/launch-bot-browser.sh` so Chrome is not tied to a short-lived IDE shell.
+**Icons / launcher (optional, Linux):** `npm run icons` exports PNGs from `assets/icon.svg`; `npm run install:desktop` installs a user-local hicolor icon and GNOME launcher. The clone path is baked in at install time via `scripts/launch-bot-browser.sh`. Start the app from your desktop environment or `bash scripts/launch-bot-browser.sh` so Chrome is not tied to a short-lived IDE shell. For a full stack restart from a terminal, `npm run bb restart` is equivalent and easier for scripts.
 
 ## Prerequisites
 
@@ -23,10 +23,28 @@ npm install
 npx playwright install chromium
 ```
 
+## Control plane (`bb`)
+
+For restarts, redeploys, and routine ops (including from agents/automation), use the **`bb`** CLI:
+
+```bash
+npm run bb help          # or: bash scripts/bb.sh help
+npm run bb status        # backend, CDP, Chrome, agent mode
+npm run bb redeploy      # build + restart backend + ensure extension
+npm run bb restart       # stop/start backend + Agent Chrome + extension
+npm run bb resume        # clear backend paused state
+npm run bb logs          # tail ~/.local/share/bot-browser/state/backend.log
+npm run bb identify-chrome   # how to spot the Agent window (profile, PID, WM_CLASS)
+npm run bb focus-chrome      # raise/open the Agent Chrome window
+```
+
+`bb` reads the same env vars as the backend (`BOT_BROWSER_PORT`, `BOT_BROWSER_HOST`, `BOT_BROWSER_CHROME_EXECUTABLE`). For flags after the command, use **`npm run bb -- identify-chrome --json`** (npm needs the `--` pass-through).
+
 ## Run backend
 
 ```bash
 npm run start
+# or: npm run bb start-backend
 ```
 
 This:
@@ -45,6 +63,8 @@ On **Google Chrome 137+**, `--load-extension` is ignored. The backend loads the 
 3. Paste the pairing token from the backend log into the side panel settings and save.
 
 If `chrome://extensions` looks empty on Chrome 154, that can be normal until the backend has run once. You can also use **Load unpacked** on `extension/` (Developer mode); restart via the desktop launcher afterward so CDP and the backend stay in sync.
+
+**Incognito:** Chrome hides extensions in Incognito until you allow them. The backend and dock launcher call `/api/extension/ensure`, which turns on **Allow in Incognito** for Bot Browser on the Agent profile automatically. There is no separate env var; to toggle manually, use `chrome://extensions` → Bot Browser → **Allow in Incognito**.
 
 ## Tests
 

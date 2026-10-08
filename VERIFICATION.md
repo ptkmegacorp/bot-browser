@@ -5,8 +5,9 @@ How to validate this project locally. Automated gates are the source of truth; m
 ## Automated suite
 
 ```bash
-npm test
-npm run build
+npm run bb test
+npm run bb build
+# or: npm test && npm run build
 ```
 
 Playwright MCP integration (optional; dedicated headless Chrome, does not touch Agent profile):
@@ -37,12 +38,12 @@ Optional gates (require Pi auth, models, and/or a running Agent Chrome profile):
 
 ## Manual acceptance (recommended before relying on the stack)
 
-1. `npm run build && npm run start` — note pairing token in the terminal (keep private).
+1. `npm run bb redeploy` or `npm run bb restart` — note pairing token in `npm run bb logs` / backend log (keep private).
 2. Load unpacked `extension/` in the **Agent** Chrome window; set backend URL and token in Settings.
 3. Open side panel; confirm connection status, model list, and bound tab summary.
 4. On `fixtures/form.html`, send a chat request that reads a field and fills another; confirm no submit and sensitive controls stay blocked.
 5. Exercise pause, human handoff, Agent off, and **Allow all sites** (if enabled) against local fixtures only.
-6. After backend code changes: **restart** `npm run start` (extension reload alone is not enough for schema/API changes).
+6. After backend code changes: **`npm run bb redeploy`** (extension reload alone is not enough for schema/API changes). Use **`npm run bb status`** to confirm backend/CDP/extension before manual panel checks.
 
 ## Operational notes
 

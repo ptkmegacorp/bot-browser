@@ -46,13 +46,18 @@ async function applyOriginPolicyChange(
 			const ok = scope.revalidateCurrentUrl(tab.url);
 			if (!ok.ok) {
 				deps.onPause();
-				deps.controller.setMode("paused");
+				deps.controller.setPaused("permission");
 				broadcast({
 					type: "site_permission_required",
 					message: ORIGIN_NOT_APPROVED_MESSAGE,
 					reason: ok.reason,
 				});
 			}
+		}
+	}
+	if (mode === "all_public_web") {
+		if (await deps.controller.tryClearPermissionPause()) {
+			deps.onResume();
 		}
 	}
 }
@@ -397,7 +402,7 @@ export function createAppServer(deps: ServerDeps) {
 				}
 				if (payload.action === "pause") {
 					deps.onPause();
-					deps.controller.setMode("paused");
+					deps.controller.setPaused("manual");
 					deps.controller.drainQueuedWork();
 					deps.controller.invalidateObservations();
 					await deps.agentHost.session.abort();
@@ -436,7 +441,10 @@ export function createAppServer(deps: ServerDeps) {
 				}
 				if (payload.action === "approve_origin" && payload.origin) {
 					deps.controller.originScope.approve(payload.origin);
-					json(res, 200, { ok: true });
+					if (await deps.controller.tryClearPermissionPause()) {
+						deps.onResume();
+					}
+					json(res, 200, { ok: true, mode: deps.controller.getMode() });
 					return;
 				}
 				if (payload.action === "attach_tab") {

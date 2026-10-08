@@ -18,6 +18,9 @@ import {
 
 export type AgentControlMode = "idle" | "running" | "paused" | "human_handoff";
 
+/** Why the agent is paused; manual Stop survives reload until Resume. */
+export type PauseReason = "manual" | "permission";
+
 interface SnapshotCache {
 	generation: number;
 	observationId: string;
@@ -65,6 +68,7 @@ export class BrowserController {
 	private testPage: Page | null = null;
 	private testBindReady: Promise<void> = Promise.resolve();
 	private agentEnabled = true;
+	private pauseReason: PauseReason | null = null;
 	readonly originScope = new OriginScope();
 
 	forTestingHoldSnapshot(hold: () => Promise<void>): void {
@@ -185,6 +189,26 @@ export class BrowserController {
 
 	setMode(mode: AgentControlMode): void {
 		this.mode = mode;
+		if (mode !== "paused") this.pauseReason = null;
+	}
+
+	getPauseReason(): PauseReason | null {
+		return this.pauseReason;
+	}
+
+	setPaused(reason: PauseReason): void {
+		this.pauseReason = reason;
+		this.mode = "paused";
+	}
+
+	/** Clear permission pause when the task tab URL is allowed again. */
+	async tryClearPermissionPause(): Promise<boolean> {
+		if (this.mode !== "paused" || this.pauseReason !== "permission") return false;
+		const state = await this.engine.getBindingState();
+		if (!state.live || !state.url) return false;
+		if (!this.originScope.revalidateCurrentUrl(state.url).ok) return false;
+		this.setMode("idle");
+		return true;
 	}
 
 	invalidateObservations(): void {

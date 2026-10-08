@@ -197,6 +197,16 @@ function hideInlineBanner() {
 	$("inlineBanner").hidden = true;
 }
 
+function syncPausedBanner() {
+	if (state.mode === "paused") {
+		showInlineBanner("Agent is paused — resume to send messages.", "Resume", () => control("resume"));
+	} else if (state.mode === "human_handoff") {
+		showInlineBanner("Finish login in the task tab, then tap Login done.", "Login done", () =>
+			control("human_handoff_done", { confirmedSafe: true }),
+		);
+	}
+}
+
 function setConnStatus(text, level = "") {
 	const el = $("connStatus");
 	el.textContent = text;
@@ -235,7 +245,12 @@ function updateComposerForMode() {
 	const running = state.mode === "running" || state.chatInFlight;
 	$("stopBtn").hidden = !running;
 	$("sendBtn").hidden = running;
-	const blocked = !state.agentEnabled || !state.tabAttached || state.connection !== "connected";
+	const blocked =
+		!state.agentEnabled ||
+		!state.tabAttached ||
+		state.connection !== "connected" ||
+		state.mode === "paused" ||
+		state.mode === "human_handoff";
 	$("sendBtn").disabled = running || blocked;
 	const allowInput = $("allowAllSites");
 	if (allowInput) {
@@ -352,8 +367,12 @@ async function connectEvents() {
 			throw new Error("events_failed");
 		}
 		state.connection = "connected";
-		setConnStatus(state.mode === "running" ? "Working" : "Connected", "ok");
-		hideInlineBanner();
+		setConnStatus(
+			state.mode === "running" ? "Working" : state.mode === "paused" ? "Paused" : "Connected",
+			state.mode === "paused" || state.mode === "human_handoff" ? "warn" : "ok",
+		);
+		if (state.mode === "paused" || state.mode === "human_handoff") syncPausedBanner();
+		else hideInlineBanner();
 		updateComposerForMode();
 		requestActiveTabSync();
 		const reader = res.body.getReader();
@@ -519,7 +538,8 @@ async function refreshStatus() {
 		renderOrigins(data.approvedOrigins ?? [], data.originPolicyMode ?? state.originPolicyMode);
 		state.lastDiag = `mode ${state.mode} · tab ${state.tabAttached ? "attached" : "none"}`;
 		$("connDiag").textContent = `Connected to ${url} · ${state.lastDiag}`;
-		hideInlineBanner();
+		if (state.mode === "paused" || state.mode === "human_handoff") syncPausedBanner();
+		else hideInlineBanner();
 	} catch {
 		state.connection = "offline";
 		setConnStatus("Offline", "err");
@@ -723,6 +743,9 @@ $("allowAllSites").addEventListener("change", async (e) => {
 	syncAllowAllPill();
 	await saveSettings();
 	await control("set_origin_policy", { originPolicyMode: mode });
+	if (wantAll && state.mode === "paused") {
+		await control("resume");
+	}
 	updatePermissionUi();
 	await refreshStatus();
 });
@@ -841,8 +864,9 @@ $("message").addEventListener("keydown", (e) => {
 $("stopBtn").addEventListener("click", async () => {
 	clearWorkingStatus();
 	state.chatInFlight = false;
-	state.mode = "idle";
 	await control("pause");
+	state.mode = "paused";
+	syncPausedBanner();
 	updateComposerForMode();
 });
 $("resumeBtn").addEventListener("click", () => control("resume"));
