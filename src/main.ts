@@ -14,12 +14,14 @@ import { createBrowserEngine } from "./browser/create-engine.js";
 import { createAgentHost } from "./agent/session.js";
 import { createAppServer } from "./server/http.js";
 import { acquireInstanceLock } from "./server/instance-lock.js";
+import { enableDebugLog, debugEvent } from "./debug-log.js";
 
 const port = Number(process.env.BOT_BROWSER_PORT ?? DEFAULT_HTTP_PORT);
 const host = process.env.BOT_BROWSER_HOST ?? DEFAULT_HTTP_HOST;
 assertLoopbackHost(host);
 
 async function boot(): Promise<void> {
+	enableDebugLog();
 	const lock = acquireInstanceLock(port);
 	const launch = await ensureAgentChrome(port);
 	if (!launch.ok || !launch.state) {
@@ -57,6 +59,7 @@ async function boot(): Promise<void> {
 	const taskOrigin = originFromUrl(launch.state.taskUrl);
 	if (taskOrigin) controller.originScope.approve(taskOrigin);
 
+	debugEvent("backend_start", { ...controller.getDebugState(), provider: agentHost.session.model?.provider, model: agentHost.session.model?.id, pid: process.pid });
 	console.log(`bot-browser listening on http://${host}:${port}`);
 	console.log(`Pairing token (set in extension): ${launch.state.pairingToken}`);
 	const extId = extensionIdFromEnv();
@@ -64,6 +67,7 @@ async function boot(): Promise<void> {
 	console.log(`Task tab: ${launch.state.taskUrl}`);
 
 	const shutdown = async () => {
+		debugEvent("backend_stop", { ...controller.getDebugState(), pid: process.pid });
 		lock.release();
 		await controller.dispose();
 		await agentHost.dispose();

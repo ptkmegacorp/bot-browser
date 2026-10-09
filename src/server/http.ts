@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { debugEvent, debugErrorCode, withDebugRun } from "../debug-log.js";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { join, normalize } from "node:path";
@@ -276,8 +277,14 @@ export function createAppServer(deps: ServerDeps) {
 				const runId = randomUUID();
 				broadcast({ type: "run_start", runId });
 				const session = deps.agentHost.session;
+				const promptMessage = payload.message;
+				const runContext = { runId, provider: session.model?.provider, model: session.model?.id, ...deps.controller.getDebugState() };
+				const started = performance.now();
+				let outcome = "ok";
 				const budgetMs = deps.runBudgetMs ?? 120_000;
 				const budget = setTimeout(() => {
+					outcome = "timeout";
+					debugEvent("run_timeout", { ...runContext, errorCode: "run_budget_exceeded" });
 					session.abort().catch(() => {});
 				}, budgetMs);
 				let unsub = () => {};
@@ -299,31 +306,38 @@ export function createAppServer(deps: ServerDeps) {
 						broadcast({ type: "tool_end", runId, name: event.toolName });
 					}
 				});
-				try {
-					if (payload.model && priorProvider && payload.model.provider !== priorProvider) {
-						broadcast({
-							type: "provider_warning",
-							message: "Switching provider may send conversation context to a new destination.",
-						});
+				await withDebugRun(runContext, async () => {
+					debugEvent("run_start");
+					try {
+						if (payload.model && priorProvider && payload.model.provider !== priorProvider) {
+							broadcast({
+								type: "provider_warning",
+								message: "Switching provider may send conversation context to a new destination.",
+							});
+						}
+						await session.prompt(promptMessage);
+						const provider = session.model?.provider ?? "";
+						if (Array.isArray(session.messages) && provider === "saturn") {
+							await runTextToolCompatibilityLoop(session, deps.controller);
+						}
+						const raw = session.getLastAssistantText() ?? "";
+						const text = sanitizeAssistantTextForUser(raw);
+						broadcast({ type: "run_end", runId, text });
+						json(res, 200, { text, runId });
+					} catch (err) {
+						if (outcome !== "timeout") outcome = "error";
+						debugEvent("run_error", { errorCode: debugErrorCode(err) });
+						const message = err instanceof Error ? err.message : "agent_error";
+						broadcast({ type: "error", runId, message });
+						json(res, 500, { error: message, runId });
+					} finally {
+						clearTimeout(budget);
+						unsub();
+						if (["paused", "human_handoff"].includes(deps.controller.getMode()) && outcome === "ok") outcome = "cancelled";
+						debugEvent("run_end", { ...deps.controller.getDebugState(), outcome, durationMs: Math.round(performance.now() - started) });
+						deps.controller.setMode(finishChatRun(deps.controller.getMode()));
 					}
-					await session.prompt(payload.message);
-					const provider = session.model?.provider ?? "";
-					if (Array.isArray(session.messages) && provider === "saturn") {
-						await runTextToolCompatibilityLoop(session, deps.controller);
-					}
-					const raw = session.getLastAssistantText() ?? "";
-					const text = sanitizeAssistantTextForUser(raw);
-					broadcast({ type: "run_end", runId, text });
-					json(res, 200, { text, runId });
-				} catch (err) {
-					const message = err instanceof Error ? err.message : "agent_error";
-					broadcast({ type: "error", runId, message });
-					json(res, 500, { error: message, runId });
-				} finally {
-					clearTimeout(budget);
-					unsub();
-					deps.controller.setMode(finishChatRun(deps.controller.getMode()));
-				}
+				});
 				return;
 			}
 

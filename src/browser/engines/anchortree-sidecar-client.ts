@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { currentDebugContext, debugEvent, debugErrorCode } from "../../debug-log.js";
 import { createInterface } from "node:readline";
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -59,10 +60,14 @@ export class AnchortreeSidecarClient {
 		});
 		const rl = createInterface({ input: proc.stdout });
 		rl.on("line", (line) => this.onLine(line));
-		proc.stderr.on("data", () => {
-			/* diagnostics only — never forwarded to model */
+		debugEvent("sidecar_start", { pid: proc.pid });
+		proc.stderr.on("data", (chunk: Buffer) => {
+			debugEvent("sidecar_stderr", { pid: proc.pid, bytes: chunk.length });
 		});
-		proc.on("exit", () => {
+		proc.on("error", () => debugEvent("sidecar_error", { pid: proc.pid, errorCode: "process_error" }));
+		proc.stdin.on("error", () => debugEvent("sidecar_stdin_error", { pid: proc.pid, errorCode: "process_error" }));
+		proc.on("exit", (exitCode, signal) => {
+			debugEvent("sidecar_exit", { pid: proc.pid, exitCode, signal });
 			this.proc = null;
 			for (const [id, p] of this.pending) {
 				clearTimeout(p.timer);
@@ -105,6 +110,9 @@ export class AnchortreeSidecarClient {
 		const epoch = this.operationEpoch;
 		const proc = this.ensureProcess();
 		const id = `r${++this.nextId}`;
+		const requestContext = currentDebugContext();
+		const started = performance.now();
+		debugEvent("sidecar_request", { ...requestContext, callId: id, name: method, pid: proc.pid });
 		const payload = {
 			v: ANCHORTREE_SIDECAR_PROTOCOL_VERSION,
 			id,
@@ -114,10 +122,12 @@ export class AnchortreeSidecarClient {
 		return new Promise((resolve) => {
 			const timer = setTimeout(() => {
 				this.pending.delete(id);
+				debugEvent("sidecar_response", { ...requestContext, callId: id, name: method, pid: proc.pid, outcome: "timeout", errorCode: "timeout", durationMs: Math.round(performance.now() - started) });
 				resolve({ ok: false, error: { code: "timeout", message: `${method} timed out` } });
 			}, this.requestTimeoutMs);
 			this.pending.set(id, {
 				resolve: (outcome) => {
+					debugEvent("sidecar_response", { ...requestContext, callId: id, name: method, pid: proc.pid, outcome: epoch !== this.operationEpoch ? "cancelled" : outcome.ok ? "ok" : "error", errorCode: epoch !== this.operationEpoch ? "operation_cancelled" : outcome.ok ? undefined : debugErrorCode(outcome.error.code), durationMs: Math.round(performance.now() - started) });
 					if (epoch !== this.operationEpoch) {
 						resolve({ ok: false, error: { code: "operation_cancelled" } });
 						return;
@@ -131,6 +141,7 @@ export class AnchortreeSidecarClient {
 	}
 
 	cancel(): void {
+		debugEvent("sidecar_cancel", { pid: this.proc?.pid, pendingCount: this.pending.size });
 		this.operationEpoch += 1;
 		for (const [id, pending] of this.pending) {
 			clearTimeout(pending.timer);

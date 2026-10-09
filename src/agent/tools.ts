@@ -1,5 +1,6 @@
 import { defineTool, type ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
+import { traceTool } from "../debug-log.js";
 import type { BrowserController } from "../browser/controller.js";
 import type { ActionVerification } from "../browser/verification.js";
 
@@ -168,5 +169,12 @@ export function createBrowserTools(controller: BrowserController): ToolDefinitio
 		browserSelect,
 		browserScroll,
 		browserScreenshot,
-	];
+	].map((tool) => {
+		const definition = tool as ToolDefinition;
+		return {
+			...definition,
+			execute: (...args: Parameters<ToolDefinition["execute"]>) =>
+				traceTool(definition.name, args[1], "sdk", () => controller.getDebugState(), () => definition.execute(...args)),
+		};
+	});
 }

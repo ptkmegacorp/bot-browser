@@ -43,6 +43,30 @@ npm run bb focus-chrome      # raise/open the Agent Chrome window
 
 `bb` reads the same env vars as the backend (`BOT_BROWSER_PORT`, `BOT_BROWSER_HOST`, `BOT_BROWSER_CHROME_EXECUTABLE`). For flags after the command, use **`npm run bb -- identify-chrome --json`** (npm needs the `--` pass-through).
 
+## Basic debugging log
+
+Backend runs write metadata-only JSONL to `~/.local/share/bot-browser/state/debug.jsonl`:
+
+```bash
+tail -f ~/.local/share/bot-browser/state/debug.jsonl
+# Filter one run using the runId returned by /api/chat:
+jq 'select(.runId == "YOUR_RUN_ID")' ~/.local/share/bot-browser/state/debug.jsonl
+```
+
+Records include run/model/actual engine identity, SDK and Qwen text-tool start/end,
+call IDs, elapsed milliseconds, bound target/generation/revision, blocked/error codes,
+verification status, cancellation/timeouts, and sidecar request/process events.
+Argument summaries contain string lengths; result summaries contain counts/status.
+User prompts, assistant/page text, URLs, refs, field values, tokens, and raw errors
+stay outside this log. Sidecar stderr is recorded as byte counts only.
+
+The active file rotates at **5 MiB**, retaining one previous file (`debug.jsonl.1`);
+files use owner-only permissions. Logging failures leave browser tools operational.
+Set `BOT_BROWSER_DEBUG_LOG=0` before starting the backend to disable this log.
+Backend changes become active after `npm run bb redeploy` (preserving Chrome).
+The existing `backend.log` console output is a separate operator log and can contain
+the startup pairing token; keep it private.
+
 ## Run backend
 
 ```bash

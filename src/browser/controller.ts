@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { debugEvent, type DebugContext } from "../debug-log.js";
 import { cdpUrl } from "../config.js";
 import { listCdpPages } from "../chrome/cdp.js";
 import type { TabBindingStore } from "./binding.js";
@@ -102,6 +103,16 @@ export class BrowserController {
 		engine?: BrowserEngine,
 	) {
 		this.engine = engine ?? createBrowserEngine(cdpPort);
+	}
+
+	/** Cached metadata only: logging never performs extra browser calls. */
+	getDebugState(): DebugContext {
+		return {
+			engine: this.engine.constructor.name,
+			targetId: this.boundTargetId,
+			generation: this.snapshotGeneration,
+			bindingRevision: this.snapshotCache?.bindingRevision,
+		};
 	}
 
 	getMode(): AgentControlMode {
@@ -218,6 +229,7 @@ export class BrowserController {
 	}
 
 	drainQueuedWork(): void {
+		debugEvent("operation_cancel", this.getDebugState());
 		this.bumpOperationEpoch();
 		this.actionQueue = Promise.resolve();
 		this.engine.cancel();

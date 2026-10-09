@@ -1,4 +1,5 @@
 import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import { traceTool } from "../debug-log.js";
 import type { BrowserController } from "../browser/controller.js";
 
 const TOOL_ALIASES: Record<string, string> = {
@@ -104,7 +105,8 @@ export async function runTextToolCompatibilityLoop(
 		const text = session.getLastAssistantText() ?? "";
 		const parsed = parseTextToolCall(text);
 		if (!parsed) return;
-		const result = await executeParsedTool(controller, parsed, lastGeneration);
+		const result = await traceTool(parsed.name, parsed.args, "text_shim", () => controller.getDebugState(),
+			() => executeParsedTool(controller, parsed, lastGeneration));
 		await session.prompt(
 			`Tool ${parsed.name} result:\n${result}\nContinue the task. For browser_fill use XML: <function=browser_fill> ref=eN generation=N text=value </function>`,
 		);
