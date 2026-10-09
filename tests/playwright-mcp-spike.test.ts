@@ -13,8 +13,10 @@ import {
 	agentChromeReachable,
 	createInProcessMcpClient,
 	refMatchingSnapshotLine,
-launchDedicatedCdpBrowser,
+	launchDedicatedCdpBrowser,
 	listCdpTargets,
+	playwrightContext,
+	requirePlaywrightBrowser,
 	mcpCall,
 	mcpConfigForCdp,
 	toolText,
@@ -70,7 +72,7 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (BOT_BROWSER_MCP_SPIKE=1)",
 	let fixtureSeq = 0;
 
 	async function openFixturePage(html: string) {
-		const ctx = session.browser.contexts()[0]!;
+		const ctx = playwrightContext(session);
 		const page = await ctx.newPage();
 		const path = `/spike-fixture-${fixtureSeq++}`;
 		await page.route(`${SPIKE_ORIGIN}/**`, async (route) => {
@@ -99,8 +101,8 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (BOT_BROWSER_MCP_SPIKE=1)",
 
 	it("selects distinct tabs with the same URL via browser_tabs index (CDP target ids differ)", async () => {
 		const fullUrl = `${SPIKE_ORIGIN}${DUP_PATH}`;
-		await openSameUrlTab(session.browser, "TAB_MARKER_ALPHA");
-		await openSameUrlTab(session.browser, "TAB_MARKER_BETA");
+		await openSameUrlTab(requirePlaywrightBrowser(session), "TAB_MARKER_ALPHA");
+		await openSameUrlTab(requirePlaywrightBrowser(session), "TAB_MARKER_BETA");
 		const targetsBefore = await listCdpTargets(session.cdpEndpoint);
 		const dupTargets = targetsBefore.filter((t) => t.url === fullUrl);
 		expect(dupTargets.length).toBeGreaterThanOrEqual(2);
@@ -217,7 +219,7 @@ describe.skipIf(!spikeEnabled)("playwright MCP spike (BOT_BROWSER_MCP_SPIKE=1)",
 		const mcp = await createInProcessMcpClient(mcpConfigForCdp(session.cdpEndpoint, outputDir));
 		await mcpCall(mcp.client, "browser_snapshot", {});
 		await mcp.close();
-		expect(session.browser.isConnected()).toBe(true);
+		expect(requirePlaywrightBrowser(session).isConnected()).toBe(true);
 		const targets = await listCdpTargets(session.cdpEndpoint);
 		expect(targets.length).toBeGreaterThan(0);
 	});

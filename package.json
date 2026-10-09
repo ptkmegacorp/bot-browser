@@ -11,6 +11,8 @@
     "test:e2e-live": "BOT_BROWSER_E2E_LIVE=1 vitest run tests/e2e-live.test.ts",
     "test:mcp-spike": "BOT_BROWSER_MCP_SPIKE=1 vitest run tests/playwright-mcp-spike.test.ts",
     "test:mcp-engine": "BOT_BROWSER_MCP_ENGINE=1 vitest run tests/playwright-mcp-engine.test.ts",
+    "build:anchortree-sidecar": "cargo build --release -p bot-browser-anchortree-sidecar --manifest-path rust/Cargo.toml",
+    "test:anchortree-engine": "BOT_BROWSER_ANCHORTREE_ENGINE=1 vitest run tests/anchortree-engine.test.ts tests/anchortree-actions.test.ts",
     "test:saturn-e2e-verify": "node scripts/saturn-e2e-verify.mjs",
     "test:acceptance": "vitest run && BOT_BROWSER_E2E_PI=1 vitest run tests/e2e-pi-qwen.test.ts tests/e2e-handoff-pi-http.test.ts",
     "test:acceptance:codex": "BOT_BROWSER_E2E_CODEX=1 vitest run tests/e2e-pi-codex.test.ts",

@@ -1,6 +1,8 @@
 # Bot Browser
 
-One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through **Playwright MCP** (`@playwright/mcp@0.0.83`, in-process MCP transport), and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`; upstream MCP supplies snapshots and actions.
+One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through **Playwright MCP** (`@playwright/mcp@0.0.83`, in-process MCP transport) by default, and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`; upstream MCP supplies snapshots and actions.
+
+**Experimental (v1 preview):** an opt-in **Anchortree-native** engine (`BOT_BROWSER_BROWSER_ENGINE=anchortree`) uses a Rust JSON-lines sidecar over CDP instead of Playwright MCP. Treat this as **supervised preview** only — happy-path browsing (e.g. public search) is demonstrated; **known lifecycle and masking gaps** are documented in [ANCHORTREE_PI_REVIEW_2026-10-09.md](./ANCHORTREE_PI_REVIEW_2026-10-09.md) and [ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md](./ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md). See [ANCHORTREE_VERIFICATION.md](./ANCHORTREE_VERIFICATION.md) for build, tests, and Qwen fixture commands.
 
 See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria. See [VERIFICATION.md](./VERIFICATION.md) for how to run automated and manual checks.
 
@@ -13,6 +15,7 @@ See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptan
 - Linux x86_64 with Google Chrome at `/usr/bin/google-chrome` (or set `BOT_BROWSER_CHROME_EXECUTABLE`)
 - [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) config at `~/.pi/agent/` (`models.json`, `auth.json`) — credentials stay out of this repo
 - Node.js 20+
+- **Anchortree preview only:** Rust toolchain (`rustup`) to build the sidecar (`npm run build:anchortree-sidecar`)
 
 ## Install
 
@@ -47,6 +50,17 @@ npm run start
 # or: npm run bb start-backend
 ```
 
+Default engine is **playwright-mcp** (no extra build). For Anchortree preview:
+
+```bash
+source "$HOME/.cargo/env"
+npm run build:anchortree-sidecar
+export BOT_BROWSER_BROWSER_ENGINE=anchortree
+npm run start
+```
+
+Use the desktop launcher (`bash scripts/launch-bot-browser.sh`) or your usual flow so Agent Chrome stays on port `9333`. Prefer **public read/search sites** and **local synthetic fixtures** (`http://127.0.0.1:9477/fixtures/…`) for trials; avoid logging into sensitive accounts until P1 review items are fixed. Current local Qwen setups typically use a `qwen*` entry from `~/.pi/agent/models.json` (see `ANCHORTREE_VERIFICATION.md`).
+
 This:
 
 1. Ensures `~/.local/share/bot-browser/chrome/` (mode `0700`)
@@ -78,7 +92,11 @@ npm run test:e2e-live        # optional: Pi model catalog (BOT_BROWSER_E2E_LIVE=
 npm run test:acceptance      # + real Pi/Qwen HTTP E2E (BOT_BROWSER_E2E_PI=1)
 npm run test:acceptance:codex  # Codex OAuth smoke (BOT_BROWSER_E2E_CODEX=1)
 npm run test:acceptance:panel  # open side panel + dedicated Chrome + real model; synthetic fixtures only
+npm run build:anchortree-sidecar   # release binary for anchortree engine
+npm run test:anchortree-engine       # BOT_BROWSER_ANCHORTREE_ENGINE=1 — native engine + actions (13 tests)
 ```
+
+Anchortree sidecar unit tests: `cargo test -p bot-browser-anchortree-sidecar --manifest-path rust/Cargo.toml`. Optional Qwen smoke: `BOT_BROWSER_E2E_ANCHORTREE_QWEN=1` (see `ANCHORTREE_VERIFICATION.md`).
 
 See [VERIFICATION.md](./VERIFICATION.md) and [SPIKE_REPORT.md](./SPIKE_REPORT.md) for MCP transport choice, pinned version, and operational limits.
 
@@ -89,7 +107,7 @@ See [VERIFICATION.md](./VERIFICATION.md) and [SPIKE_REPORT.md](./SPIKE_REPORT.md
 | `BOT_BROWSER_PORT` | `9477` |
 | `BOT_BROWSER_HOST` | `127.0.0.1` |
 | `BOT_BROWSER_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
-| `BOT_BROWSER_BROWSER_ENGINE` | `playwright-mcp` (production). Set to `fake` for tests that inject `FakeBrowserEngine` via the controller constructor. |
+| `BOT_BROWSER_BROWSER_ENGINE` | `playwright-mcp` (default). `anchortree` = experimental native sidecar (preview). `fake` = tests that inject `FakeBrowserEngine` via the controller constructor. |
 | `BOT_BROWSER_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
 
 ## License

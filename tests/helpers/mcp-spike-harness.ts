@@ -2,7 +2,7 @@ import { createConnection, type Config } from "@playwright/mcp";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { chromium, type Browser } from "playwright";
+import { chromium, type Browser, type BrowserContext } from "playwright";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -34,13 +34,35 @@ export async function listCdpTargets(cdpEndpoint: string): Promise<CdpPageTarget
 
 export interface DedicatedCdpSession {
 	cdpEndpoint: string;
-	browser: Browser;
+	/** Playwright context that owns the Chromium process (remote-debugging-port). */
+	context: BrowserContext;
+	/** Second CDP client when attached; omit for Anchortree-only tests (exclusive sidecar CDP). */
+	browser?: Browser;
 	userDataDir: string;
 	cleanup: () => Promise<void>;
 }
 
+export function playwrightContext(session: DedicatedCdpSession): BrowserContext {
+	return session.browser?.contexts()[0] ?? session.context;
+}
+
+export function requirePlaywrightBrowser(session: DedicatedCdpSession): Browser {
+	if (!session.browser) {
+		throw new Error("launchDedicatedCdpBrowser({ attachPlaywright: true }) required");
+	}
+	return session.browser;
+}
+
+export interface LaunchDedicatedCdpOptions {
+	/** When false, do not open a second Playwright CDP session (Anchortree sidecar is sole controller). */
+	attachPlaywright?: boolean;
+}
+
 /** Headless dedicated Chrome for destructive spike tests (never touches Agent Chrome). */
-export async function launchDedicatedCdpBrowser(): Promise<DedicatedCdpSession> {
+export async function launchDedicatedCdpBrowser(
+	options?: LaunchDedicatedCdpOptions,
+): Promise<DedicatedCdpSession> {
+	const attachPlaywright = options?.attachPlaywright ?? true;
 	const userDataDir = await mkdtemp(join(tmpdir(), "bot-browser-mcp-spike-"));
 	const port = await pickFreePort();
 	const persistent = await chromium.launchPersistentContext(userDataDir, {
@@ -49,13 +71,17 @@ export async function launchDedicatedCdpBrowser(): Promise<DedicatedCdpSession> 
 	});
 	const cdpEndpoint = `http://127.0.0.1:${port}`;
 	await waitForCdp(cdpEndpoint);
-	const pwBrowser = await chromium.connectOverCDP(cdpEndpoint);
+	let pwBrowser: Browser | undefined;
+	if (attachPlaywright) {
+		pwBrowser = await chromium.connectOverCDP(cdpEndpoint);
+	}
 	return {
 		cdpEndpoint,
+		context: persistent,
 		browser: pwBrowser,
 		userDataDir,
 		cleanup: async () => {
-			await pwBrowser.close().catch(() => {});
+			await pwBrowser?.close().catch(() => {});
 			await persistent.close().catch(() => {});
 			await rm(userDataDir, { recursive: true, force: true }).catch(() => {});
 		},

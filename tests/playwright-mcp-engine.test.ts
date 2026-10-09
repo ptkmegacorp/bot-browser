@@ -12,6 +12,8 @@ import { readMainBodyTextForCdpTarget } from "../src/browser/engines/cdp-target-
 import {
 	launchDedicatedCdpBrowser,
 	listCdpTargets,
+	playwrightContext,
+	requirePlaywrightBrowser,
 	type DedicatedCdpSession,
 } from "./helpers/mcp-spike-harness.js";
 
@@ -61,8 +63,8 @@ describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (BOT_BROWSER_MCP_ENGIN
 
 	it("observes only the bound target when two tabs share URL/title", async () => {
 		const fullUrl = `${SPIKE_ORIGIN}${DUP_PATH}`;
-		await openSameUrlTab(session.browser, "ENGINE_TAB_ALPHA");
-		await openSameUrlTab(session.browser, "ENGINE_TAB_BETA");
+		await openSameUrlTab(requirePlaywrightBrowser(session), "ENGINE_TAB_ALPHA");
+		await openSameUrlTab(requirePlaywrightBrowser(session), "ENGINE_TAB_BETA");
 		const targets = (await listCdpTargets(session.cdpEndpoint)).filter((t) => t.url.includes(DUP_PATH));
 		expect(targets.length).toBeGreaterThanOrEqual(2);
 		const withMarkers = await Promise.all(
@@ -96,7 +98,7 @@ describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (BOT_BROWSER_MCP_ENGIN
 	});
 
 	it("returns target_unavailable after the bound CDP target is closed", async () => {
-		const ctx = session.browser.contexts()[0]!;
+		const ctx = playwrightContext(session);
 		const page = await ctx.newPage();
 		const path = `/engine-close-${Date.now()}`;
 		await page.route(`${SPIKE_ORIGIN}/**`, async (route) => {
@@ -132,7 +134,7 @@ describe.skipIf(!engineTestsEnabled)("PlaywrightMcpEngine (BOT_BROWSER_MCP_ENGIN
 
 	it("cancel clears binding epoch; observe works after re-bind", async () => {
 		const engine = new PlaywrightMcpEngine({ cdpUrl: session.cdpEndpoint, outputDir });
-		const ctx = session.browser.contexts()[0]!;
+		const ctx = playwrightContext(session);
 		const page = await ctx.newPage();
 		const path = `/engine-cancel-${Date.now()}`;
 		await page.route(`${SPIKE_ORIGIN}/**`, async (route) => {

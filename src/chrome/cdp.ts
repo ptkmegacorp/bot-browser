@@ -29,6 +29,17 @@ export async function activateCdpTarget(cdpBase: string, targetId: string): Prom
 	}
 }
 
+/** Browser-level CDP WebSocket URL (`/json/version` → `webSocketDebuggerUrl`). */
+export async function cdpWebSocketUrl(cdpBase: string): Promise<string> {
+	const res = await fetch(`${cdpBase.replace(/\/$/, "")}/json/version`, {
+		signal: AbortSignal.timeout(5000),
+	});
+	if (!res.ok) throw new Error("cdp_version_failed");
+	const body = (await res.json()) as { webSocketDebuggerUrl?: string };
+	if (!body.webSocketDebuggerUrl) throw new Error("cdp_ws_url_missing");
+	return body.webSocketDebuggerUrl;
+}
+
 export async function listCdpPages(cdpBase: string): Promise<CdpPageTarget[]> {
 	const res = await fetch(`${cdpBase.replace(/\/$/, "")}/json/list`, {
 		signal: AbortSignal.timeout(5000),

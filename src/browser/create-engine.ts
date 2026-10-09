@@ -1,12 +1,18 @@
 import { join } from "node:path";
 import { cdpUrl, stateDir } from "../config.js";
 import type { BrowserEngine } from "./engine.js";
+import { AnchortreeEngine } from "./engines/anchortree-engine.js";
 import { FakeBrowserEngine } from "./engines/fake-engine.js";
 import { PlaywrightMcpEngine } from "./engines/playwright-mcp.js";
 
 export function createBrowserEngine(cdpPort: number): BrowserEngine {
 	if (process.env.BOT_BROWSER_BROWSER_ENGINE === "fake") {
 		return new FakeBrowserEngine();
+	}
+	if (process.env.BOT_BROWSER_BROWSER_ENGINE === "anchortree") {
+		return new AnchortreeEngine({
+			cdpUrl: cdpUrl(cdpPort),
+		});
 	}
 	return new PlaywrightMcpEngine({
 		cdpUrl: cdpUrl(cdpPort),

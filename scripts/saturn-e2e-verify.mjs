@@ -1,3 +1,8 @@
+/**
+ * Legacy headed verify — uses Playwright connectOverCDP on :9333 (second CDP client).
+ * Do not run while Anchortree sidecar/backend owns the same tab; prefer
+ * scripts/anchortree-visible-trial.mjs + scripts/cdp-target-eval.mjs for Anchortree trials.
+ */
 import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

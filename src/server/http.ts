@@ -201,6 +201,12 @@ export function createAppServer(deps: ServerDeps) {
 				}
 				json(res, 200, {
 					apiVersion: API_VERSION,
+					browserEngine:
+						process.env.BOT_BROWSER_BROWSER_ENGINE === "anchortree"
+							? "anchortree"
+							: process.env.BOT_BROWSER_BROWSER_ENGINE === "fake"
+								? "fake"
+								: "playwright-mcp",
 					mode: deps.controller.getMode(),
 					agentEnabled: policy.agentEnabled,
 					bindingMode: policy.bindingMode,

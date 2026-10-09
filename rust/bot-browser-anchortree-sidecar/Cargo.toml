@@ -1,0 +1,18 @@
+[package]
+name = "bot-browser-anchortree-sidecar"
+version = "0.1.0"
+edition = "2021"
+license = "ISC"
+description = "JSON-lines CDP sidecar for Bot Browser Anchortree engine"
+
+[dependencies]
+anchortree-cdp = { path = "../../vendor/anchortree/crates/anchortree-cdp" }
+anchortree-core = { path = "../../vendor/anchortree/crates/anchortree-core" }
+chromiumoxide = "0.9"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "rt-multi-thread", "sync", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "rt-multi-thread"] }

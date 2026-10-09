@@ -10,6 +10,7 @@ import { isConsequentialControl, isSensitiveField } from "../src/browser/safety.
 import {
 	launchDedicatedCdpBrowser,
 	listCdpTargets,
+	playwrightContext,
 	type DedicatedCdpSession,
 } from "./helpers/mcp-spike-harness.js";
 
@@ -31,7 +32,7 @@ describe.skipIf(!enabled)("Playwright MCP review fixes (BOT_BROWSER_MCP_ENGINE=1
 	});
 
 	async function openFixture(html: string, slug: string) {
-		const ctx = session.browser.contexts()[0]!;
+		const ctx = playwrightContext(session);
 		const page = await ctx.newPage();
 		const path = `/review-${slug}-${Date.now()}`;
 		await page.route(`${ORIGIN}/**`, async (route) => {
