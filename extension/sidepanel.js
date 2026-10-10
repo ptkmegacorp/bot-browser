@@ -241,6 +241,29 @@ function syncAllowAllPill() {
 	pill.setAttribute("aria-checked", input.checked ? "true" : "false");
 }
 
+function updateTokenCount(usage) {
+	$("tokenCount").textContent = usage
+		? `${usage.input.toLocaleString()} in · ${usage.output.toLocaleString()} out`
+		: "— tokens";
+	$("tokenCount").title = usage
+		? `Last request, including tool steps. Stop reason: ${usage.stopReason}`
+		: "Token usage for the last request";
+}
+
+function resetChatUi() {
+	clearWorkingStatus();
+	transcriptEl().querySelectorAll(".msg").forEach((el) => el.remove());
+	$("scrollToBottom").hidden = true;
+	state.streamingAssistantEl = null;
+	state.streamingMsgWrap = null;
+	state.streamingText = "";
+	state.currentRunId = null;
+	state.pendingMessage = null;
+	$("message").value = "";
+	updateTokenCount(null);
+	focusComposer();
+}
+
 function updateComposerForMode() {
 	const running = state.mode === "running" || state.chatInFlight;
 	$("stopBtn").hidden = !running;
@@ -252,6 +275,7 @@ function updateComposerForMode() {
 		state.mode === "paused" ||
 		state.mode === "human_handoff";
 	$("sendBtn").disabled = running || blocked;
+	$("newChatBtn").disabled = running || state.connection !== "connected";
 	const allowInput = $("allowAllSites");
 	if (allowInput) {
 		allowInput.disabled = state.connection !== "connected" || running;
@@ -419,7 +443,11 @@ function handleEvent(data) {
 		case "text_delta":
 			updateAssistantStream(data.delta ?? "");
 			break;
+		case "chat_reset":
+			resetChatUi();
+			break;
 		case "run_end":
+			updateTokenCount(data.usage);
 			finalizeAssistantStream(data.text ?? state.streamingText);
 			state.chatInFlight = false;
 			state.mode = "idle";
@@ -654,15 +682,30 @@ async function refreshTabs() {
 }
 
 async function control(action, extra = {}) {
-	if (action === "attach_tab" && extra.revision == null) {
-		extra.revision = await nextBindingRevision();
+	try {
+		if (action === "attach_tab" && extra.revision == null) {
+			extra.revision = await nextBindingRevision();
+		}
+		const res = await fetch(`${baseUrl()}/api/control`, {
+			method: "POST",
+			headers: headers(),
+			body: JSON.stringify({ action, ...extra }),
+		});
+		if (!res.ok) {
+			const data = await res.json();
+			showInlineBanner(data.message ?? data.error ?? "Could not update browser settings.");
+			return false;
+		}
+		await refreshStatus();
+		return true;
+	} catch {
+		state.connection = "offline";
+		setConnStatus("Offline", "err");
+		showInlineBanner("Backend unreachable — check connection in Settings.", "Open settings", () => openSettings("connection"));
+		updateContextBar();
+		updateComposerForMode();
+		return false;
 	}
-	await fetch(`${baseUrl()}/api/control`, {
-		method: "POST",
-		headers: headers(),
-		body: JSON.stringify({ action, ...extra }),
-	});
-	await refreshStatus();
 }
 
 function openSettings(section) {
@@ -812,6 +855,13 @@ $("composer").addEventListener("submit", async (e) => {
 		if (!res.ok) {
 			$("message").value = draft;
 			clearWorkingStatus();
+			if (!state.streamingText.trim()) {
+				state.streamingMsgWrap?.remove();
+				state.streamingAssistantEl = null;
+				state.streamingMsgWrap = null;
+			}
+			// Status polling may clear a banner; keep the rejection in the transcript.
+			appendMessage("error", String(data.message ?? data.error ?? "Request failed."), "error");
 			const err = data.error ?? "request_failed";
 			if (err === "agent_paused") {
 				showInlineBanner("Agent is paused — resume or finish login first.", "Resume", () => control("resume"));
@@ -833,10 +883,10 @@ $("composer").addEventListener("submit", async (e) => {
 					openSettings("browser"),
 				);
 			} else {
-				appendMessage("error", escapeHtml(String(data.message ?? err)), "error");
 				if (data.message) state.lastDiag = data.message;
 			}
 		} else {
+			updateTokenCount(data.usage);
 			if (data.runId) state.currentRunId = data.runId;
 			if (data.text && state.streamingAssistantEl) {
 				finalizeAssistantStream(data.text);
@@ -845,12 +895,29 @@ $("composer").addEventListener("submit", async (e) => {
 	} catch {
 		$("message").value = draft;
 		clearWorkingStatus();
+		appendMessage("error", "Network error — open Settings to reconnect.", "error");
 		showInlineBanner("Network error — open Settings to reconnect.", "Open settings", () => openSettings("connection"));
 	} finally {
 		state.chatInFlight = false;
 		await refreshStatus();
 		updateComposerForMode();
 		focusComposer();
+	}
+});
+
+$("newChatBtn").addEventListener("click", async () => {
+	if ($("newChatBtn").disabled) return;
+	state.chatInFlight = true;
+	updateComposerForMode();
+	try {
+		const res = await fetch(`${baseUrl()}/api/new-chat`, { method: "POST", headers: headers() });
+		if (!res.ok) throw new Error("reset_failed");
+		resetChatUi();
+	} catch {
+		showInlineBanner("Could not start a new chat. Wait for the current request to finish and try again.");
+	} finally {
+		state.chatInFlight = false;
+		updateComposerForMode();
 	}
 });
 
@@ -864,7 +931,7 @@ $("message").addEventListener("keydown", (e) => {
 $("stopBtn").addEventListener("click", async () => {
 	clearWorkingStatus();
 	state.chatInFlight = false;
-	await control("pause");
+	if (!await control("pause")) return;
 	state.mode = "paused";
 	syncPausedBanner();
 	updateComposerForMode();
@@ -916,6 +983,11 @@ loadSettings().then(async () => {
 		await control("set_origin_policy", { originPolicyMode: "all_public_web" });
 	}
 	await refreshStatus();
-	await connectEvents();
 	state.statusTimer = setInterval(refreshStatus, 3000);
+	await connectEvents();
+}).catch(() => {
+	state.connection = "offline";
+	setConnStatus("Offline", "err");
+	showInlineBanner("Could not initialize the panel. Reload it to reconnect.");
+	updateComposerForMode();
 });

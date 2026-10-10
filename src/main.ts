@@ -32,6 +32,8 @@ async function boot(): Promise<void> {
 	const bindings = new TabBindingStore();
 	const engine = createBrowserEngine(launch.state.cdpPort);
 	const controller = new BrowserController(bindings, launch.state.cdpPort, engine);
+	// The bundled welcome/fixture pages remain usable after starting on another site.
+	controller.originScope.approve(`http://${host}:${port}`);
 	bindings.syncFromChromeState(launch.state, 0);
 
 	const agentHost = await createAgentHost(controller);
@@ -54,7 +56,10 @@ async function boot(): Promise<void> {
 	});
 
 	const taskCdp = cdpUrl(launch.state.cdpPort);
-	await navigateCdpTarget(taskCdp, launch.state.taskTargetId, launch.state.taskUrl);
+	// Only refresh our welcome page, which may have opened before the server.
+	if (launch.state.taskUrl === `http://${host}:${port}/fixtures/welcome.html`) {
+		await navigateCdpTarget(taskCdp, launch.state.taskTargetId, launch.state.taskUrl);
+	}
 	await controller.connect(launch.state.taskTargetId);
 	const taskOrigin = originFromUrl(launch.state.taskUrl);
 	if (taskOrigin) controller.originScope.approve(taskOrigin);

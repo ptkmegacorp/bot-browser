@@ -28,6 +28,7 @@ export interface AgentHost {
 	session: AgentSession;
 	modelRuntime: ModelRuntime;
 	setModel(model: AgentModel): Promise<void>;
+	newChat(): Promise<void>;
 	listModels(): Promise<Array<{ provider: string; id: string; label: string }>>;
 	dispose(): Promise<void>;
 }
@@ -74,20 +75,26 @@ export async function createAgentHost(
 		modelRuntime.getModel(provider, modelId) ?? (await modelRuntime.getAvailable())[0];
 	if (!selected) throw new Error("no_authorized_models");
 
-	const { session } = await createAgentSession({
+	const makeSession = async (thinkingLevel = options.thinkingLevel ?? DEFAULT_THINKING_LEVEL) => (await createAgentSession({
 		cwd: process.cwd(),
 		model: selected,
-		thinkingLevel: options.thinkingLevel ?? DEFAULT_THINKING_LEVEL,
+		thinkingLevel,
 		modelRuntime,
 		tools: tools.map((tool) => tool.name),
 		customTools: tools,
 		resourceLoader: buildResourceLoader(options.systemPromptAppend),
 		sessionManager: SessionManager.inMemory(),
 		settingsManager,
-	});
+	})).session;
+	let session = await makeSession();
 
 	return {
-		session,
+		get session() { return session; },
+		async newChat() {
+			const next = await makeSession(session.thinkingLevel);
+			session.dispose();
+			session = next;
+		},
 		modelRuntime,
 		async setModel(model: AgentModel) {
 			selected = model;

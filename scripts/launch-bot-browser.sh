@@ -5,6 +5,7 @@ PORT="${BOT_BROWSER_PORT:-9477}"
 HOST="${BOT_BROWSER_HOST:-127.0.0.1}"
 PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/chrome"
 STATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/state"
+ENGINE_ENV="${STATE_DIR}/engine.env"
 EXT_DIR="${BOT_BROWSER_EXTENSION_PATH:-$REPO_ROOT/extension}"
 WELCOME="http://${HOST}:${PORT}/fixtures/welcome.html"
 LAUNCH_LOG="${STATE_DIR}/launcher.log"
@@ -171,11 +172,14 @@ notify "Starting backend and Agent Chrome…"
 
 run_backend() {
 	setup_node_path
+	set -a
+	[[ -f "$ENGINE_ENV" ]] && . "$ENGINE_ENV"
+	set +a
 	cd "$REPO_ROOT"
 	exec npm run start
 }
 
-BACKEND_CMD="export NVM_DIR=\"\${NVM_DIR:-\$HOME/.nvm}\"; [[ -s \"\$NVM_DIR/nvm.sh\" ]] && . \"\$NVM_DIR/nvm.sh\"; nvm use default >/dev/null 2>&1 || true; cd '$REPO_ROOT' && npm run start"
+BACKEND_CMD="set -a; [[ -f '$ENGINE_ENV' ]] && . '$ENGINE_ENV'; set +a; export NVM_DIR=\"\${NVM_DIR:-\$HOME/.nvm}\"; [[ -s \"\$NVM_DIR/nvm.sh\" ]] && . \"\$NVM_DIR/nvm.sh\"; nvm use default >/dev/null 2>&1 || true; cd '$REPO_ROOT' && npm run start"
 
 if command -v gnome-terminal >/dev/null 2>&1; then
 	exec gnome-terminal --title="Bot Browser" -- bash -lc "$BACKEND_CMD; echo; read -r -p 'Press Enter to close…' _"

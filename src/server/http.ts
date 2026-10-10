@@ -4,7 +4,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { readFile } from "node:fs/promises";
 import { join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
-import { API_VERSION, extensionIdFromEnv, MAX_CHAT_BODY_BYTES, MAX_WS_MESSAGE_BYTES } from "../config.js";
+import {
+	API_VERSION,
+	extensionIdFromEnv,
+	MAX_CHAT_BODY_BYTES,
+	MAX_WS_MESSAGE_BYTES,
+	resolvedBrowserEngineId,
+} from "../config.js";
 import { AgentPolicy, type BindingMode } from "./agent-policy.js";
 import { finishChatRun } from "./control.js";
 import { runTextToolCompatibilityLoop } from "../agent/text-tool-shim.js";
@@ -98,6 +104,7 @@ export function createAppServer(deps: ServerDeps) {
 	const extensionId = extensionIdFromEnv();
 	const clients = new Set<ServerResponse>();
 	const policy = new AgentPolicy();
+	let conversationBusy = false;
 
 	function authorize(req: IncomingMessage) {
 		return parseAuth(req, deps.pairingToken, extensionId);
@@ -112,7 +119,26 @@ export function createAppServer(deps: ServerDeps) {
 
 	const server = createServer(async (req, res) => {
 		const url = new URL(req.url ?? "/", `http://${deps.host}:${deps.port}`);
+		let ownsConversation = false;
 		try {
+			if (req.method === "POST" && ["/api/chat", "/api/new-chat"].includes(url.pathname)) {
+				const auth = authorize(req);
+				if (!auth.ok) {
+					json(res, 401, { error: auth.reason });
+					return;
+				}
+				if (conversationBusy) {
+					json(res, 409, { error: "chat_busy" });
+					return;
+				}
+				conversationBusy = ownsConversation = true;
+			}
+			if (url.pathname === "/api/new-chat" && req.method === "POST") {
+				await deps.agentHost.newChat();
+				broadcast({ type: "chat_reset" });
+				json(res, 200, { ok: true });
+				return;
+			}
 			if (url.pathname === "/health") {
 				json(res, 200, { ok: true });
 				return;
@@ -202,12 +228,7 @@ export function createAppServer(deps: ServerDeps) {
 				}
 				json(res, 200, {
 					apiVersion: API_VERSION,
-					browserEngine:
-						process.env.BOT_BROWSER_BROWSER_ENGINE === "anchortree"
-							? "anchortree"
-							: process.env.BOT_BROWSER_BROWSER_ENGINE === "fake"
-								? "fake"
-								: "playwright-mcp",
+					browserEngine: resolvedBrowserEngineId(),
 					mode: deps.controller.getMode(),
 					agentEnabled: policy.agentEnabled,
 					bindingMode: policy.bindingMode,
@@ -287,8 +308,20 @@ export function createAppServer(deps: ServerDeps) {
 					debugEvent("run_timeout", { ...runContext, errorCode: "run_budget_exceeded" });
 					session.abort().catch(() => {});
 				}, budgetMs);
+				let usage: { input: number; output: number; stopReason: string } | null = null;
+				let modelError: string | undefined;
 				let unsub = () => {};
 				unsub = session.subscribe((event) => {
+					if (event.type === "message_end" && event.message.role === "assistant") {
+						modelError = event.message.stopReason === "error"
+							? (event.message.errorMessage ?? "Model request failed. Please try again.") : undefined;
+						const u = event.message.usage;
+						usage = {
+							input: (usage?.input ?? 0) + u.input + u.cacheRead + u.cacheWrite,
+							output: (usage?.output ?? 0) + u.output,
+							stopReason: event.message.stopReason,
+						};
+					}
 					if (event.type === "message_update" && event.assistantMessageEvent.type === "text_delta") {
 						const delta = event.assistantMessageEvent.delta;
 						if (!delta || /<tool_call|<function=/i.test(delta)) return;
@@ -320,10 +353,12 @@ export function createAppServer(deps: ServerDeps) {
 						if (Array.isArray(session.messages) && provider === "saturn") {
 							await runTextToolCompatibilityLoop(session, deps.controller);
 						}
+						if (modelError) throw new Error(modelError);
 						const raw = session.getLastAssistantText() ?? "";
 						const text = sanitizeAssistantTextForUser(raw);
-						broadcast({ type: "run_end", runId, text });
-						json(res, 200, { text, runId });
+						if (usage) debugEvent("model_usage", { inputTokens: usage.input, outputTokens: usage.output, stopReason: usage.stopReason });
+						broadcast({ type: "run_end", runId, text, usage });
+						json(res, 200, { text, runId, usage });
 					} catch (err) {
 						if (outcome !== "timeout") outcome = "error";
 						debugEvent("run_error", { errorCode: debugErrorCode(err) });
@@ -514,6 +549,8 @@ export function createAppServer(deps: ServerDeps) {
 		} catch (err) {
 			const message = err instanceof Error ? err.message : "server_error";
 			json(res, 500, { error: message });
+		} finally {
+			if (ownsConversation) conversationBusy = false;
 		}
 	});
 

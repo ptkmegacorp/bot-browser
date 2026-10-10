@@ -1,8 +1,10 @@
 # Bot Browser
 
-One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through **Playwright MCP** (`@playwright/mcp@0.0.83`, in-process MCP transport) by default, and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`; upstream MCP supplies snapshots and actions.
+One visible system Google Chrome window (profile display name **Agent**), one bound task tab, and chat in a Chrome side panel. The Node backend binds the selected tab by Chrome CDP target ID, drives browser mechanics through the **Anchortree-native** engine (Rust JSON-lines sidecar over CDP) by default, and runs a Pi SDK agent with guarded browser-only tools. Policy, origin scope, safety preflight, and lifecycle stay in `BrowserController`.
 
-**Experimental (v1 preview):** an opt-in **Anchortree-native** engine (`BOT_BROWSER_BROWSER_ENGINE=anchortree`) uses a Rust JSON-lines sidecar over CDP instead of Playwright MCP. Treat this as **supervised preview** only — happy-path browsing (e.g. public search) is demonstrated; **known lifecycle and masking gaps** are documented in [ANCHORTREE_PI_REVIEW_2026-10-09.md](./ANCHORTREE_PI_REVIEW_2026-10-09.md) and [ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md](./ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md). See [ANCHORTREE_VERIFICATION.md](./ANCHORTREE_VERIFICATION.md) for build, tests, and Qwen fixture commands.
+**Anchortree (default, v1 preview):** build the sidecar once (`npm run build:anchortree-sidecar`). Treat as **supervised preview** — happy-path browsing is demonstrated; **known lifecycle and masking gaps** are in [ANCHORTREE_PI_REVIEW_2026-10-09.md](./ANCHORTREE_PI_REVIEW_2026-10-09.md) and [ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md](./ANCHORTREE_PI_REVIEW_CURSOR_VALIDATION.md). See [ANCHORTREE_VERIFICATION.md](./ANCHORTREE_VERIFICATION.md).
+
+**Playwright MCP (legacy opt-in):** set `BOT_BROWSER_BROWSER_ENGINE=playwright-mcp` to use `@playwright/mcp@0.0.83` in-process instead of the sidecar.
 
 See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptance criteria. See [VERIFICATION.md](./VERIFICATION.md) for how to run automated and manual checks.
 
@@ -15,7 +17,7 @@ See [BUILD_PLAN.md](./BUILD_PLAN.md) for product scope, guardrails, and acceptan
 - Linux x86_64 with Google Chrome at `/usr/bin/google-chrome` (or set `BOT_BROWSER_CHROME_EXECUTABLE`)
 - [Pi coding agent](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) config at `~/.pi/agent/` (`models.json`, `auth.json`) — credentials stay out of this repo
 - Node.js 20+
-- **Anchortree preview only:** Rust toolchain (`rustup`) to build the sidecar (`npm run build:anchortree-sidecar`)
+- Rust toolchain (`rustup`) to build the Anchortree sidecar (`npm run build:anchortree-sidecar`)
 
 ## Install
 
@@ -74,12 +76,11 @@ npm run start
 # or: npm run bb start-backend
 ```
 
-Default engine is **playwright-mcp** (no extra build). For Anchortree preview:
+Default engine is **anchortree** (build the sidecar once, then start as usual):
 
 ```bash
 source "$HOME/.cargo/env"
 npm run build:anchortree-sidecar
-export BOT_BROWSER_BROWSER_ENGINE=anchortree
 npm run start
 ```
 
@@ -131,7 +132,7 @@ See [VERIFICATION.md](./VERIFICATION.md) and [SPIKE_REPORT.md](./SPIKE_REPORT.md
 | `BOT_BROWSER_PORT` | `9477` |
 | `BOT_BROWSER_HOST` | `127.0.0.1` |
 | `BOT_BROWSER_CHROME_EXECUTABLE` | `/usr/bin/google-chrome` |
-| `BOT_BROWSER_BROWSER_ENGINE` | `playwright-mcp` (default). `anchortree` = experimental native sidecar (preview). `fake` = tests that inject `FakeBrowserEngine` via the controller constructor. |
+| `BOT_BROWSER_BROWSER_ENGINE` | `anchortree` (default). `playwright-mcp` = legacy Playwright MCP. `fake` = tests that inject `FakeBrowserEngine` via the controller constructor. |
 | `BOT_BROWSER_EXTENSION_ID` | Optional; when set, only that `chrome-extension://` origin is accepted |
 
 ## License

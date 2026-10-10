@@ -125,18 +125,14 @@ async function waitForCdp(port: number, deadlineMs: number): Promise<boolean> {
 	return false;
 }
 
-async function pickOrCreateTaskTab(
+export async function pickOrCreateTaskTab(
 	cdpBase: string,
-	existingTargetId: string | undefined,
 	welcome: string,
 ): Promise<{ targetId: string; url: string }> {
 	const pages = await listCdpPages(cdpBase);
-	if (existingTargetId) {
-		const hit = pages.find((p) => p.id === existingTargetId);
-		if (hit) return { targetId: hit.id, url: hit.url };
-	}
-	const welcomeTab = pages.find((p) => p.url.includes("/fixtures/welcome.html"));
-	if (welcomeTab) return { targetId: welcomeTab.id, url: welcomeTab.url };
+	const webPages = pages.filter((p) => /^https?:\/\//.test(p.url));
+	const first = webPages.find((p) => p.url !== welcome) ?? webPages[0];
+	if (first) return { targetId: first.id, url: first.url };
 	// open via CDP new target
 	const res = await fetch(`${cdpBase.replace(/\/$/, "")}/json/new?${encodeURIComponent(welcome)}`, {
 		method: "PUT",
@@ -187,7 +183,7 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 				return undefined;
 			});
 			if (extId) console.log(`Extension loaded: ${extId}`);
-			const tab = await pickOrCreateTaskTab(base, prior.taskTargetId, welcome);
+			const tab = await pickOrCreateTaskTab(base, welcome);
 			const state: ChromeRuntimeState = {
 				...prior,
 				taskTargetId: tab.targetId,
@@ -212,7 +208,7 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 				return undefined;
 			});
 			if (extId) console.log(`Extension loaded: ${extId}`);
-			const tab = await pickOrCreateTaskTab(base, prior?.taskTargetId, welcome);
+			const tab = await pickOrCreateTaskTab(base, welcome);
 			const state: ChromeRuntimeState = {
 				pid,
 				cdpPort: port,
@@ -248,7 +244,7 @@ export async function ensureAgentChrome(httpPort: number): Promise<LaunchResult>
 	});
 	if (extId) console.log(`Extension loaded: ${extId}`);
 
-	const tab = await pickOrCreateTaskTab(base, prior?.taskTargetId, welcome);
+	const tab = await pickOrCreateTaskTab(base, welcome);
 	const state: ChromeRuntimeState = {
 		pid: child.pid ?? -1,
 		cdpPort: port,

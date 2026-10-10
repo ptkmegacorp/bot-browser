@@ -76,13 +76,9 @@ export class AgentPolicy {
 		}
 
 		const live = await controller.syncLiveBinding();
-		if (
-			live.attached &&
-			live.targetId === targetId &&
-			live.url &&
-			(!url || live.url === url) &&
-			controller.getMode() !== "running"
-		) {
+		// Chrome sends URL/load updates for agent navigation too. Only a different
+		// CDP target is a tab switch; rebinding this target would cancel our own run.
+		if (live.attached && live.targetId === targetId && live.url) {
 			this.bindingRevision = input.revision;
 			return { ok: true, targetId: live.targetId, url: live.url };
 		}

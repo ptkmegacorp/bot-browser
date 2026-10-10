@@ -62,6 +62,17 @@ export function cdpUrl(port = DEFAULT_CDP_PORT): string {
 	return `http://127.0.0.1:${port}`;
 }
 
+export type BrowserEngineId = "anchortree" | "playwright-mcp" | "fake";
+
+/** Resolved browser engine for this process (`BOT_BROWSER_BROWSER_ENGINE` overrides default). */
+export function resolvedBrowserEngineId(): BrowserEngineId {
+	const raw = process.env.BOT_BROWSER_BROWSER_ENGINE?.trim().toLowerCase();
+	if (raw === "fake") return "fake";
+	if (raw === "playwright-mcp" || raw === "playwright" || raw === "mcp") return "playwright-mcp";
+	if (raw === "anchortree") return "anchortree";
+	return "anchortree";
+}
+
 export const DEFAULT_MODEL = {
 	provider: "saturn",
 	id: "qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local",

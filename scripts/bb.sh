@@ -10,6 +10,7 @@ BASE="http://${HOST}:${PORT}"
 CDP_URL="http://127.0.0.1:9333/json/version"
 PROFILE="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/chrome"
 STATE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/bot-browser/state"
+ENGINE_ENV="${STATE_DIR}/engine.env"
 BACKEND_LOG="${STATE_DIR}/backend.log"
 RUNTIME_JSON="${STATE_DIR}/chrome-runtime.json"
 CHROME_BIN="${BOT_BROWSER_CHROME_EXECUTABLE:-/usr/bin/google-chrome}"
@@ -41,6 +42,7 @@ Commands:
   redeploy             build + restart-backend + ensure-extension (keeps Chrome if up)
 
 Environment: BOT_BROWSER_PORT, BOT_BROWSER_HOST, BOT_BROWSER_CHROME_EXECUTABLE,
+             BOT_BROWSER_BROWSER_ENGINE (default anchortree; optional $ENGINE_ENV),
              BOT_BROWSER_EXTENSION_PATH (see README).
 
 Examples:
@@ -206,7 +208,7 @@ start_backend() {
 	setup_node_path
 	mkdir -p "$STATE_DIR"
 	rm -f "${STATE_DIR}/backend.lock"
-	setsid -f bash -lc "cd '$REPO_ROOT' && npm run start >> '$BACKEND_LOG' 2>&1" || true
+	setsid -f bash -lc "set -a; [[ -f '$ENGINE_ENV' ]] && . '$ENGINE_ENV'; set +a; cd '$REPO_ROOT' && npm run start >> '$BACKEND_LOG' 2>&1" || true
 	local i
 	for i in $(seq 1 20); do
 		if backend_healthy; then

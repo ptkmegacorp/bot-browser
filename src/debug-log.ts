@@ -29,15 +29,18 @@ type DebugFields = DebugContext & {
 	exitCode?: number | null;
 	signal?: string | null;
 	verification?: string;
+	inputTokens?: number;
+	outputTokens?: number;
+	stopReason?: string;
 };
 
 const stringFields = new Set([
 	"runId", "provider", "model", "engine", "targetId", "callId", "name", "source",
-	"outcome", "errorCode", "signal", "verification",
+	"outcome", "errorCode", "signal", "verification", "stopReason",
 ]);
 const numberFields = new Set([
 	"generation", "bindingRevision", "durationMs", "textChars", "valueChars", "nodeCount",
-	"pendingCount", "bytes", "pid", "exitCode",
+	"pendingCount", "bytes", "pid", "exitCode", "inputTokens", "outputTokens",
 ]);
 const errorCodes = new Set([
 	"operation_cancelled", "timeout", "stale_observation", "stale_ref", "unknown_ref",
