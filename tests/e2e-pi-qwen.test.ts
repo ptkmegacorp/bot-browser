@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_MODEL } from "../src/config.js";
+import { DEFAULT_MODEL_PROVIDER, preferredModelId } from "../src/config.js";
 import { TabBindingStore } from "../src/browser/binding.js";
 import { BrowserController } from "../src/browser/controller.js";
 import { apiHeaders, startPiE2eServer } from "./helpers/pi-e2e-server.js";
@@ -44,8 +44,8 @@ describe.skipIf(!enabled)("Pi SDK + Qwen browser-tool E2E", () => {
 				controller,
 				taskUrl: page.url(),
 				agentOptions: {
-					provider: DEFAULT_MODEL.provider,
-					modelId: DEFAULT_MODEL.id,
+					provider: DEFAULT_MODEL_PROVIDER,
+					modelId: preferredModelId(),
 					systemPromptAppend: `For form-fill tasks: call page_snapshot once, then browser_fill the name input with exactly "${FILL_VALUE}". Never click buttons.`,
 				},
 				runBudgetMs: 180_000,

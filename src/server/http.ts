@@ -228,7 +228,7 @@ export function createAppServer(deps: ServerDeps) {
 				}
 				json(res, 200, {
 					apiVersion: API_VERSION,
-					browserEngine: resolvedBrowserEngineId(),
+					browserEngine: deps.controller.getEngineName(),
 					mode: deps.controller.getMode(),
 					agentEnabled: policy.agentEnabled,
 					bindingMode: policy.bindingMode,

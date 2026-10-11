@@ -8,7 +8,8 @@ import {
 	type ResourceLoader,
 } from "@earendil-works/pi-coding-agent";
 import type { BrowserController } from "../browser/controller.js";
-import { DEFAULT_MODEL, DEFAULT_THINKING_LEVEL } from "../config.js";
+import { DEFAULT_THINKING_LEVEL, preferredModelId } from "../config.js";
+import { buildModelList, discoverServedModels, resolveDefaultModel } from "./model-discovery.js";
 import { createBrowserTools } from "./tools.js";
 
 type AgentModel = NonNullable<ReturnType<ModelRuntime["getModel"]>>;
@@ -69,11 +70,17 @@ export async function createAgentHost(
 		retry: { enabled: true, maxRetries: 2 },
 	});
 
-	const provider = options.provider ?? DEFAULT_MODEL.provider;
-	const modelId = options.modelId ?? DEFAULT_MODEL.id;
+	const resolved = await resolveDefaultModel(modelRuntime, {
+		provider: options.provider,
+		modelId: options.modelId ?? preferredModelId(),
+	});
+	// The wire id must exist in the Pi catalog; the live llama id is used for the
+	// display label and falls back to the catalog entry when it is not registered.
 	let selected =
-		modelRuntime.getModel(provider, modelId) ?? (await modelRuntime.getAvailable())[0];
+		modelRuntime.getModel(resolved.provider, resolved.id) ??
+		(await modelRuntime.getAvailable())[0];
 	if (!selected) throw new Error("no_authorized_models");
+	const liveLabel = resolved.label;
 
 	const makeSession = async (thinkingLevel = options.thinkingLevel ?? DEFAULT_THINKING_LEVEL) => (await createAgentSession({
 		cwd: process.cwd(),
@@ -102,11 +109,17 @@ export async function createAgentHost(
 		},
 		async listModels() {
 			const available = await modelRuntime.getAvailable();
-			return available.map((m) => ({
-				provider: m.provider,
-				id: m.id,
-				label: `${m.provider}/${m.id}`,
-			}));
+			const served = await discoverServedModels();
+			const models = buildModelList(available, served);
+			if (models.length === 0 && selected) {
+				models.push({
+					provider: selected.provider,
+					id: selected.id,
+					label: liveLabel,
+					source: "catalog",
+				});
+			}
+			return models;
 		},
 		async dispose() {
 			session.dispose();

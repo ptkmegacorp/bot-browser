@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { DEFAULT_MODEL } from "../src/config.js";
+import { DEFAULT_MODEL_PROVIDER, preferredModelId } from "../src/config.js";
 import { TabBindingStore } from "../src/browser/binding.js";
 import { BrowserController } from "../src/browser/controller.js";
 import { apiHeaders, startPiE2eServer } from "../tests/helpers/pi-e2e-server.js";
@@ -16,7 +16,7 @@ const { server, agentHost } = await startPiE2eServer({
 	token: "t",
 	controller,
 	taskUrl: page.url(),
-	agentOptions: { provider: DEFAULT_MODEL.provider, modelId: DEFAULT_MODEL.id },
+	agentOptions: { provider: DEFAULT_MODEL_PROVIDER, modelId: preferredModelId() },
 });
 const res = await fetch("http://127.0.0.1:19668/api/chat", {
 	method: "POST",

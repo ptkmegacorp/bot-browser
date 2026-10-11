@@ -5,6 +5,13 @@ import { AnchortreeEngine } from "./engines/anchortree-engine.js";
 import { FakeBrowserEngine } from "./engines/fake-engine.js";
 import { PlaywrightMcpEngine } from "./engines/playwright-mcp.js";
 
+export function engineName(engine: BrowserEngine): string {
+	if (engine instanceof AnchortreeEngine) return "anchortree";
+	if (engine instanceof FakeBrowserEngine) return "fake";
+	if (engine instanceof PlaywrightMcpEngine) return "playwright-mcp";
+	return engine.constructor.name;
+}
+
 export function createBrowserEngine(cdpPort: number): BrowserEngine {
 	switch (resolvedBrowserEngineId()) {
 		case "fake":

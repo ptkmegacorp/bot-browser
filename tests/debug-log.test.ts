@@ -20,7 +20,7 @@ beforeEach(() => {
 	setDebugLog(new DebugLog(path));
 });
 afterEach(() => { setDebugLog(undefined); rmSync(dir, { recursive: true, force: true }); vi.restoreAllMocks(); });
-const state = () => ({ engine: "AnchortreeEngine", targetId: "test-target", generation: 2, bindingRevision: 3 });
+const state = () => ({ engineName: "anchortree", targetId: "test-target", generation: 2, bindingRevision: 3 });
 function rows() { return readFileSync(path, "utf8").trim().split("\n").map((line) => JSON.parse(line)); }
 
 it("correlates async calls and logs blocked outcomes while omitting values and raw results", async () => {
@@ -126,7 +126,7 @@ it.each([false, true])("records HTTP run context and budget timeout (timeout=%s)
 		expect(events.map((r) => r.event)).toEqual(timeout
 			? ["run_start", "tool_start", "tool_end", "run_timeout", "run_end"]
 			: ["run_start", "tool_start", "tool_end", "run_end"]);
-		expect(events[0]).toMatchObject({ provider: "test-provider", model: "test-model", engine: "FakeBrowserEngine" });
+		expect(events[0]).toMatchObject({ provider: "test-provider", model: "test-model", engineName: "fake" });
 		expect(events.at(-1)).toMatchObject({ outcome: timeout ? "timeout" : "ok" });
 		expect(readFileSync(path, "utf8")).not.toMatch(/SECRET_AUTH|PRIVATE_/);
 	} finally {

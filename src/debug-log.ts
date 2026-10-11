@@ -7,7 +7,7 @@ export interface DebugContext {
 	runId?: string;
 	provider?: string;
 	model?: string;
-	engine?: string;
+	engineName?: string;
 	targetId?: string | null;
 	generation?: number;
 	bindingRevision?: number;
@@ -35,7 +35,7 @@ type DebugFields = DebugContext & {
 };
 
 const stringFields = new Set([
-	"runId", "provider", "model", "engine", "targetId", "callId", "name", "source",
+	"runId", "provider", "model", "engineName", "targetId", "callId", "name", "source",
 	"outcome", "errorCode", "signal", "verification", "stopReason",
 ]);
 const numberFields = new Set([

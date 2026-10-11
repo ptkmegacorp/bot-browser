@@ -4,7 +4,7 @@ import { cdpUrl } from "../config.js";
 import { listCdpPages } from "../chrome/cdp.js";
 import type { TabBindingStore } from "./binding.js";
 import type { BrowserEngine, EngineErrorCode, EngineOutcome } from "./engine.js";
-import { createBrowserEngine } from "./create-engine.js";
+import { createBrowserEngine, engineName } from "./create-engine.js";
 import { PlaywrightPageEngine } from "./engines/playwright-page.js";
 import { OriginScope, originFromUrl } from "./origin-scope.js";
 import { bumpDocumentGeneration, currentDocumentGeneration, type PageSnapshot } from "./snapshot.js";
@@ -108,7 +108,7 @@ export class BrowserController {
 	/** Cached metadata only: logging never performs extra browser calls. */
 	getDebugState(): DebugContext {
 		return {
-			engine: this.engine.constructor.name,
+			engineName: engineName(this.engine),
 			targetId: this.boundTargetId,
 			generation: this.snapshotGeneration,
 			bindingRevision: this.snapshotCache?.bindingRevision,
@@ -117,6 +117,10 @@ export class BrowserController {
 
 	getMode(): AgentControlMode {
 		return this.mode;
+	}
+
+	getEngineName(): string {
+		return engineName(this.engine);
 	}
 
 	getAttachedTabUrl(): string | null {

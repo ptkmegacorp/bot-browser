@@ -73,10 +73,21 @@ export function resolvedBrowserEngineId(): BrowserEngineId {
 	return "anchortree";
 }
 
-export const DEFAULT_MODEL = {
-	provider: "saturn",
-	id: "qwen3.8-27b-huihui-swift-gsq-rco-iq2_xs-local",
-} as const;
+/** OpenAI-compatible llama-server base URL for the currently loaded profile. */
+export function llamaBaseUrl(): string {
+	return process.env.BOT_BROWSER_LLAMA_URL?.trim() || "http://127.0.0.1:8091/v1";
+}
+
+/**
+ * Optional pin for the local model id. When unset, the id is discovered from the
+ * live llama-server so the reported name always matches what is actually served.
+ */
+export function preferredModelId(): string | undefined {
+	const id = process.env.BOT_BROWSER_MODEL_ID?.trim();
+	return id || undefined;
+}
+
+export const DEFAULT_MODEL_PROVIDER = "saturn";
 
 export const DEFAULT_THINKING_LEVEL = "off" as const;
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_MODEL } from "../src/config.js";
+import { DEFAULT_MODEL_PROVIDER, preferredModelId } from "../src/config.js";
 import { TabBindingStore } from "../src/browser/binding.js";
 import { BrowserController } from "../src/browser/controller.js";
 import { AnchortreeEngine } from "../src/browser/engines/anchortree-engine.js";
@@ -79,8 +79,8 @@ describe.skipIf(!enabled)("Pi + Qwen + Anchortree engine E2E", () => {
 				controller,
 				taskUrl: page.url(),
 				agentOptions: {
-					provider: DEFAULT_MODEL.provider,
-					modelId: DEFAULT_MODEL.id,
+					provider: DEFAULT_MODEL_PROVIDER,
+					modelId: preferredModelId(),
 					systemPromptAppend: `For form-fill tasks: call page_snapshot once, then browser_fill the name input with exactly "${FILL_VALUE}". Never click buttons.`,
 				},
 				runBudgetMs: 180_000,
@@ -108,7 +108,7 @@ describe.skipIf(!enabled)("Pi + Qwen + Anchortree engine E2E", () => {
 			const tools = toolSequenceFromMessages(agentHost.session.messages);
 			const evidence = {
 				engine: "anchortree",
-				model: { provider: DEFAULT_MODEL.provider, id: DEFAULT_MODEL.id },
+				model: { provider: DEFAULT_MODEL_PROVIDER, id: preferredModelId() ?? agentHost.session.model?.id },
 				runId: body.runId,
 				chatElapsedMs,
 				runBudgetMs: 180_000,
